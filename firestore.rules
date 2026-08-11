@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Only these emails may read every user's attendance data (admin screen).
+    // Keep this list in sync with `adminEmails` in src/environments/environment*.ts.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email in [
+        'example@gmail.com'
+      ];
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isValidUserProfile() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['displayName', 'email'])
+        && data.displayName is string
+        && data.email is string;
+    }
+
+    function isValidAttendanceRecord() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['type', 'timestamp'])
+        && data.type in ['clockIn', 'clockOut', 'breakStart', 'breakEnd']
+        && data.timestamp is timestamp;
+    }
+
+    // Admin-only correction of an existing punch: the type never changes,
+    // the new timestamp must be a timestamp, and `correctedFrom` must equal
+    // whatever the timestamp was before this edit (a self-updating audit trail).
+    function isValidRecordCorrection() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return after.type == before.type
+        && after.timestamp is timestamp
+        && after.correctedFrom == before.timestamp
+        && after.keys().hasOnly(['type', 'timestamp', 'correctedFrom']);
+    }
+
+    function isValidCorrectionRequest() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['type', 'originalAt', 'correctedAt', 'reason', 'status', 'createdAt'])
+        && data.type in ['clockIn', 'clockOut', 'breakStart', 'breakEnd']
+        && data.originalAt is timestamp
+        && data.correctedAt is timestamp
+        && data.reason is string
+        && data.reason.size() <= 200
+        && data.status == 'pending'
+        && data.createdAt == request.time;
+    }
+
+    // Admin may only move a pending request to approved/rejected; the
+    // original request fields (type/originalAt/correctedAt/reason/createdAt)
+    // must stay untouched.
+    function isValidReview() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return before.status == 'pending'
+        && after.status in ['approved', 'rejected']
+        && after.type == before.type
+        && after.originalAt == before.originalAt
+        && after.correctedAt == before.correctedAt
+        && after.reason == before.reason
+        && after.createdAt == before.createdAt
+        && after.keys().hasOnly(['type', 'originalAt', 'correctedAt', 'reason', 'status', 'createdAt', 'reviewedAt', 'reviewedBy'])
+        && after.reviewedAt == request.time
+        && after.reviewedBy is string;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && isValidUserProfile();
+      allow delete: if false;
+
+      match /attendanceRecords/{recordId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if (isOwner(userId) || isAdmin()) && isValidAttendanceRecord();
+        allow update: if isAdmin() && isValidRecordCorrection();
+        allow delete: if false;
+      }
+
+      // Employee-submitted punch-correction requests, reviewed by the admin.
+      match /correctionRequests/{requestId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidCorrectionRequest();
+        allow update: if isAdmin() && isValidReview();
+        allow delete: if false;
+      }
+    }
+
+    // Deny everything else by default, including any future collections.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

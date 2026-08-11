@@ -1,0 +1,90 @@
+<header class="topbar">
+  <a class="topbar-link" routerLink="/">← 戻る</a>
+  <span class="brand">全員の勤怠一覧（管理者用）</span>
+</header>
+
+<main class="content">
+  <section class="card">
+    <h2>打刻修正申請</h2>
+    @if (reviewMessage()) {
+      <p class="feedback">{{ reviewMessage() }}</p>
+    }
+    @if (pendingCorrectionRequests().length === 0) {
+      <p class="muted">申請中の依頼はありません。</p>
+    } @else {
+      <ul class="request-list">
+        @for (req of pendingCorrectionRequests(); track req.id) {
+          <li>
+            <span class="request-type">{{ req.displayName }}</span>
+            <span>{{ req.typeLabel }} {{ req.originalLabel }} → {{ req.correctedLabel }}</span>
+            <span class="request-reason">{{ req.reason }}</span>
+            <button type="button" class="btn btn-primary" (click)="approve(req.uid, req.id)">許可</button>
+            <button type="button" class="btn btn-ghost" (click)="reject(req.uid, req.id)">却下</button>
+          </li>
+        }
+      </ul>
+    }
+
+    @if (reviewedCorrectionRequests().length > 0) {
+      <h3 class="reviewed-heading">対応済みの申請</h3>
+      <ul class="request-list">
+        @for (req of reviewedCorrectionRequests(); track req.id) {
+          <li>
+            <span class="request-type">{{ req.displayName }}</span>
+            <span>{{ req.typeLabel }} {{ req.originalLabel }} → {{ req.correctedLabel }}</span>
+            <span class="request-reason">{{ req.reason }}</span>
+            <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (adminAttendanceService.historyByUser().length === 0) {
+    <section class="card">
+      <p class="muted">まだ打刻データがありません。</p>
+    </section>
+  } @else {
+    @for (userHistory of adminAttendanceService.historyByUser(); track userHistory.uid) {
+      <section class="card">
+        <h2>{{ userHistory.displayName }}</h2>
+        @for (month of userHistory.months; track month.monthKey) {
+          <div class="month-block">
+            <div class="month-heading">
+              <h3>{{ month.monthLabel }}</h3>
+              @if (month.actualWorkDurationLabel) {
+                <span class="duration-chip">月間実労働時間 {{ month.actualWorkDurationLabel }}</span>
+              }
+            </div>
+            @for (day of month.days; track day.dateKey) {
+              <div class="day-block">
+                <div class="day-heading">
+                  <span class="day-date">{{ day.dateLabel }}</span>
+                  <span class="durations">
+                    @if (day.workDurationLabel) {
+                      <span>勤務 {{ day.workDurationLabel }}</span>
+                    }
+                    @if (day.breakDurationLabel) {
+                      <span>休憩 {{ day.breakDurationLabel }}</span>
+                    }
+                    @if (day.actualWorkDurationLabel) {
+                      <span>実働 {{ day.actualWorkDurationLabel }}</span>
+                    }
+                  </span>
+                </div>
+                <ul class="record-list">
+                  @for (record of day.records; track record.timestamp.getTime()) {
+                    <li>
+                      <span class="record-type">{{ record.typeLabel }}</span>
+                      <span>{{ record.timeLabel }}</span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+  }
+</main>
