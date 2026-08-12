@@ -27,6 +27,63 @@
 
     <!-- ▼ スイッチがオフの時：普段の打刻画面 ▼ -->
     @if (!showHistory()) {
+      @if (isAdmin()) {
+        <div class="admin-panel" style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">👑 管理者メニュー</h3>
+          @if (pendingCorrectionCount() > 0) {
+            <div style="color: red; font-weight: bold; margin: 10px 0; padding: 10px; background: #fff3f3; border: 1px solid red; border-radius: 4px;">
+              🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
+            </div>
+            <!-- ▼ 未承認リストの表示 ▼ -->
+            <div style="margin-top: 20px;">
+              @for (request of pendingRequests(); track request.id) {
+                <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div style="flex: 1;">
+                      <div style="font-weight: bold; margin-bottom: 5px;">
+                        <span style="color: #666;">ユーザー: </span>
+                        <span>{{ request.userId }}</span>
+                      </div>
+                      <div style="margin-bottom: 5px;">
+                        <span style="color: #666;">対象: </span>
+                        <span style="background: #e3f2fd; padding: 2px 8px; border-radius: 4px;">{{ typeLabels[request.type] }}</span>
+                      </div>
+                      <div style="margin-bottom: 5px;">
+                        <span style="color: #666;">修正内容: </span>
+                        <span>{{ request.originalAt | date: 'M/d HH:mm:ss' }} → {{ request.correctedAt | date: 'M/d HH:mm:ss' }}</span>
+                      </div>
+                      <div style="margin-bottom: 10px;">
+                        <span style="color: #666;">理由: </span>
+                        <span style="color: #333; font-style: italic;">{{ request.reason }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 10px;">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      (click)="approveRequest(request)"
+                      [disabled]="reviewingRequestId() === request.id"
+                      style="flex: 1;"
+                    >
+                      ✓ 承認
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      (click)="rejectRequest(request)"
+                      [disabled]="reviewingRequestId() === request.id"
+                      style="flex: 1; background: #d32f2f; color: white;"
+                    >
+                      ✗ 却下
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
       <section class="card">
         <div class="action-row">
           <div class="action-buttons">

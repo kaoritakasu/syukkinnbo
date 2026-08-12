@@ -1,6 +1,7 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal, effect } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
-import { collection, getDocs, getFirestore, query } from 'firebase/firestore';
+import { DatePipe } from '@angular/common';
+import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 import { AttendanceType } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
@@ -13,6 +14,13 @@ const CORRECTION_TYPE_OPTIONS: { value: AttendanceType; label: string }[] = [
   { value: 'breakStart', label: '休憩開始' },
   { value: 'breakEnd', label: '休憩終了' },
 ];
+
+const TYPE_LABELS: { [key: string]: string } = {
+  'clockIn': '出勤',
+  'clockOut': '退勤',
+  'breakStart': '休憩開始',
+  'breakEnd': '休憩終了',
+};
 
 const clockDateFormatter = new Intl.DateTimeFormat('ja-JP', {
   year: 'numeric',
@@ -36,7 +44,7 @@ const STATUS_LABELS = {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet, RouterLink, DatePipe],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -45,12 +53,17 @@ export class App {
   protected readonly authService = inject(AuthService);
   protected readonly attendanceService = inject(AttendanceService);
   protected readonly correctionRequestService = inject(CorrectionRequestService);
-
+  protected readonly isAdmin = computed(() => this.authService.user()?.email === 'kaori.takasu@pathoslogos.co.jp');
+  protected readonly pendingCorrectionCount = signal<number>(0);
+  protected readonly pendingRequests = signal<any[]>([]);
+  private unsubscribePendingRequests: any = null;
   protected readonly saving = signal(false);
+  protected readonly reviewingRequestId = signal<string | null>(null);
   protected readonly statusMessage = signal<string | null>(null);
   protected readonly statusLabel = computed(() => STATUS_LABELS[this.attendanceService.todayStatus()]);
 
   protected readonly correctionTypeOptions = CORRECTION_TYPE_OPTIONS;
+  protected readonly typeLabels = TYPE_LABELS;
   protected readonly showCorrectionForm = signal(false);
   protected readonly showHistory = signal(false);
   protected readonly correctionType = signal<AttendanceType>('clockIn');
@@ -72,7 +85,50 @@ export class App {
     this.loadWorkingMembers();
     const membersIntervalId = setInterval(() => this.loadWorkingMembers(), 10000);
     inject(DestroyRef).onDestroy(() => clearInterval(membersIntervalId));
-  }
+    
+    effect(() => {
+      // 管理者としてログインしている時だけ動かす
+      if (this.isAdmin()) {
+        const db = getFirestore();
+        // 全ユーザーの申請データから「pending（承認待ち）」だけを探す
+        const pendingQuery = query(
+          collectionGroup(db, 'correctionRequests'),
+          where('status', '==', 'pending')
+        );
+
+        // onSnapshotでリアルタイム監視スタート！
+        this.unsubscribePendingRequests = onSnapshot(pendingQuery, (snapshot) => {
+          // 見つかった件数を signal にセットする
+          this.pendingCorrectionCount.set(snapshot.docs.length);
+
+          // 詳細データを取得
+          const requests = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            const userId = docSnap.ref.parent?.parent?.id;
+            return {
+              id: docSnap.id,
+              userId,
+              type: data['type'],
+              originalAt: data['originalAt'].toDate(),
+              originalAtTimestamp: data['originalAt'],
+              correctedAt: data['correctedAt'].toDate(),
+              correctedAtTimestamp: data['correctedAt'],
+              reason: data['reason'],
+              status: data['status'],
+              createdAt: data['createdAt'].toDate(),
+            };
+          });
+          this.pendingRequests.set(requests);
+        });
+      } else {
+        // 管理者じゃない場合は監視をストップして件数を0にする
+        if (this.unsubscribePendingRequests) {
+          this.unsubscribePendingRequests();
+        }
+        this.pendingCorrectionCount.set(0);
+      }
+    });
+  } 
 
   protected login(): void {
     this.authService.loginWithGoogle().catch((err) => console.error(err));
@@ -189,6 +245,11 @@ export class App {
   }
 
   private async loadWorkingMembers(): Promise<void> {
+    const user = this.authService.user();
+    if (!user) {
+      this.workingMembers.set([]);
+      return;
+    }
     try {
       const db = getFirestore();
       const usersSnapshot = await getDocs(query(collection(db, 'users')));
@@ -238,6 +299,65 @@ export class App {
       return 'clockedIn';
     } else {
       return 'clockedOut';
+    }
+  }
+
+  protected async rejectRequest(request: any): Promise<void> {
+    this.reviewingRequestId.set(request.id);
+    try {
+      const db = getFirestore();
+      const requestRef = doc(db, 'users', request.userId, 'correctionRequests', request.id);
+      await updateDoc(requestRef, {
+        status: 'rejected',
+        reviewedAt: serverTimestamp(),
+        reviewedBy: this.authService.user()?.email || '',
+      });
+    } catch (err) {
+      console.error('Failed to reject request:', err);
+    } finally {
+      this.reviewingRequestId.set(null);
+    }
+  }
+
+  protected async approveRequest(request: any): Promise<void> {
+    this.reviewingRequestId.set(request.id);
+    try {
+      const db = getFirestore();
+      const recordsRef = collection(db, 'users', request.userId, 'attendanceRecords');
+      const recordQuery = query(
+        recordsRef,
+        where('type', '==', request.type),
+        where('timestamp', '==', request.originalAtTimestamp)
+      );
+      const recordSnapshot = await getDocs(recordQuery);
+
+      if (recordSnapshot.docs.length === 0) {
+        console.error('Original attendance record not found');
+        return;
+      }
+
+      const originalRecord = recordSnapshot.docs[0];
+      const batch = writeBatch(db);
+
+      // Update attendance record
+      batch.update(originalRecord.ref, {
+        timestamp: request.correctedAtTimestamp,
+        correctedFrom: request.originalAtTimestamp,
+      });
+
+      // Update correction request
+      const requestRef = doc(db, 'users', request.userId, 'correctionRequests', request.id);
+      batch.update(requestRef, {
+        status: 'approved',
+        reviewedAt: serverTimestamp(),
+        reviewedBy: this.authService.user()?.email || '',
+      });
+
+      await batch.commit();
+    } catch (err) {
+      console.error('Failed to approve request:', err);
+    } finally {
+      this.reviewingRequestId.set(null);
     }
   }
 }
