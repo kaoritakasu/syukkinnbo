@@ -156,16 +156,41 @@ export class AttendanceService {
     return this.record('breakEnd');
   }
 
-  private async record(type: AttendanceType): Promise<void> {
+ private async record(type: AttendanceType): Promise<void> {
     const user = this.authService.user();
     if (!user) {
       throw new Error('ログインしていません');
     }
 
+    // ▼ GPSを取得する処理を追加
+    const position = await this.getCurrentPosition();
+
     const recordsRef = collection(firestore, 'users', user.uid, 'attendanceRecords');
-    await addDoc(recordsRef, {
+    
+    // ▼ 保存するデータを組み立てる
+    const recordData: any = {
       type,
       timestamp: serverTimestamp(),
+    };
+
+    if (position) {
+      recordData.latitude = position.coords.latitude;
+      recordData.longitude = position.coords.longitude;
+    }
+
+    await addDoc(recordsRef, recordData);
+  }
+
+private getCurrentPosition(): Promise<GeolocationPosition | null> {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null); // GPS非対応ブラウザ
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve(pos),
+          (err) => resolve(null), // ユーザーが「許可しない」を押した時はエラーにせずスキップ
+          { timeout: 5000, maximumAge: 0 } // 最大5秒待機
+        );
+      }
     });
   }
-}
