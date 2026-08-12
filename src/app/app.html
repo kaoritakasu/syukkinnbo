@@ -31,12 +31,16 @@
         <div class="admin-panel" style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <h3 style="margin-top: 0;">👑 管理者メニュー</h3>
           @if (pendingCorrectionCount() > 0) {
-            <div style="color: red; font-weight: bold; margin: 10px 0; padding: 10px; background: #fff3f3; border: 1px solid red; border-radius: 4px;">
+            <div
+              style="color: red; font-weight: bold; margin: 10px 0; padding: 10px; background: #fff3f3; border: 1px solid red; border-radius: 4px; cursor: pointer; text-decoration: underline;"
+              (click)="showPendingRequests.set(!showPendingRequests())"
+            >
               🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
             </div>
             <!-- ▼ 未承認リストの表示 ▼ -->
-            <div style="margin-top: 20px;">
-              @for (request of pendingRequests(); track request.id) {
+            @if (showPendingRequests()) {
+              <div style="margin-top: 20px;">
+                @for (request of pendingRequests(); track request.id) {
                 <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                   <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                     <div style="flex: 1;">
@@ -79,8 +83,9 @@
                     </button>
                   </div>
                 </div>
-              }
-            </div>
+                }
+              </div>
+            }
           }
         </div>
       }

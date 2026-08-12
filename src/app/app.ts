@@ -56,6 +56,7 @@ export class App {
   protected readonly isAdmin = computed(() => this.authService.user()?.email === 'kaori.takasu@pathoslogos.co.jp');
   protected readonly pendingCorrectionCount = signal<number>(0);
   protected readonly pendingRequests = signal<any[]>([]);
+  protected readonly showPendingRequests = signal(false);
   private unsubscribePendingRequests: any = null;
   protected readonly saving = signal(false);
   protected readonly reviewingRequestId = signal<string | null>(null);
