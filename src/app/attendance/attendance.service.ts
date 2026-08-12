@@ -194,3 +194,4 @@ private getCurrentPosition(): Promise<GeolocationPosition | null> {
       }
     });
   }
+}

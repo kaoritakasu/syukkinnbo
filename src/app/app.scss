@@ -458,6 +458,55 @@
   color: #1f2430;
 }
 
+.work-duration-chart {
+  display: flex;
+  align-items: flex-end;
+  overflow-x: auto;
+  gap: 4px;
+  height: 150px;
+  margin-bottom: 1.5rem;
+  padding: 1rem 0.5rem 0.5rem;
+  background: #fafbfc;
+  border-radius: 0.5rem;
+  border: 1px solid #eef0f3;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.work-duration-chart::-webkit-scrollbar {
+  display: none;
+}
+
+.chart-bar-container {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 30px;
+}
+
+.chart-bar {
+  width: 24px;
+  background: linear-gradient(to top, #2563eb, #3b82f6);
+  border-radius: 4px 4px 0 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+  min-height: 4px;
+  cursor: pointer;
+}
+
+.chart-bar:hover {
+  background: linear-gradient(to top, #1d4ed8, #2563eb);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.chart-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 @media (max-width: 480px) {
   .topbar {
     padding: 0.75rem 1rem;

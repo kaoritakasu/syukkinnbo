@@ -41,7 +41,7 @@ const STATUS_LABELS = {
   styleUrl: './app.scss'
 })
 export class App {
-  protected readonly title = signal('出勤簿');
+  protected readonly title = signal('Pathoslogos 出勤簿');
   protected readonly authService = inject(AuthService);
   protected readonly attendanceService = inject(AttendanceService);
   protected readonly correctionRequestService = inject(CorrectionRequestService);
