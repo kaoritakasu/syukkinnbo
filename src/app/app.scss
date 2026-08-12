@@ -32,6 +32,8 @@
 }
 
 .clock-date {
+  flex: 1;
+  text-align: center;
   font-size: 0.8125rem;
   font-weight: 500;
   color: #6b7280;
@@ -51,6 +53,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-left: auto;
   font-size: 0.875rem;
   color: #6b7280;
 }
@@ -224,30 +227,29 @@
 }
 
 .action-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.25rem;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 横2列に均等配置 */
+  gap: 1.25rem; /* ボタン同士の隙間 */
+  width: 100%; /* 親要素の幅いっぱいに広げる */
+  max-width: 800px; /* 広がりすぎ防止（数値はお好みで調整してください） */
+  margin: 0 auto; /* 中央寄せ */
 }
 
 .action-buttons {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.75rem;
-  flex: 1 1 auto;
-  min-width: 15rem;
 }
 
 .clock-buttons,
 .break-buttons {
-  display: flex;
-  gap: 0.75rem;
+  display: contents;
 }
 
 .clock-buttons .btn,
 .break-buttons .btn {
-  flex: 1;
+  width: 100%;
+  max-width: none;
   min-height: 4rem;
 }
 
@@ -427,6 +429,35 @@
   color: #374151;
 }
 
+.working-members-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.working-members-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.working-member-card {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 1.5rem;
+  background: #f5f6f8;
+  border: 1px solid #e2e4e9;
+  border-radius: 0.625rem;
+  min-width: 150px;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #1f2430;
+}
+
 @media (max-width: 480px) {
   .topbar {
     padding: 0.75rem 1rem;
@@ -442,6 +473,7 @@
   }
 
   .action-buttons {
+    grid-template-columns: 1fr;
     min-width: 100%;
   }
 

@@ -24,160 +24,197 @@
 
 <main class="content">
   @if (authService.user()) {
-    <section class="card">
-      <div class="action-row">
-        <div class="action-buttons">
-          <div class="clock-buttons">
-            <button
-              type="button"
-              class="btn btn-primary btn-lg"
-              (click)="clockIn()"
-              [disabled]="saving() || attendanceService.todayStatus() === 'clockedIn'"
-            >出勤</button>
-            <button
-              type="button"
-              class="btn btn-primary btn-lg"
-              (click)="clockOut()"
-              [disabled]="saving() || attendanceService.todayStatus() === 'notClockedIn'"
-            >退勤</button>
-          </div>
-          <div class="break-buttons">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              (click)="breakStart()"
-              [disabled]="saving() || attendanceService.todayStatus() !== 'clockedIn'"
-            >休憩開始</button>
-            <button
-              type="button"
-              class="btn btn-secondary"
-              (click)="breakEnd()"
-              [disabled]="saving() || attendanceService.todayStatus() !== 'onBreak'"
-            >休憩終了</button>
-          </div>
-        </div>
-        <div class="status-col">
-          <span class="status-badge" [attr.data-status]="attendanceService.todayStatus()">{{ statusLabel() }}</span>
-          <span class="clock-time">{{ nowTimeLabel() }}</span>
-        </div>
-      </div>
-      @if (statusMessage()) {
-        <p class="feedback">{{ statusMessage() }}</p>
-      }
-    </section>
 
-    <div class="card-columns">
-    <section class="card">
-      <div class="card-header">
-        <h2>打刻修正申請</h2>
-        <button type="button" class="btn btn-outline" (click)="openCorrectionForm()">申請する</button>
-      </div>
-
-      @if (showCorrectionForm()) {
-        <div class="correction-form">
-          <label>
-            間違えたボタン
-            <select [value]="correctionType()" (change)="setCorrectionType($any($event.target).value)">
-              @for (option of correctionTypeOptions; track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            打刻ミスをした日時
-            <input
-              type="datetime-local"
-              [value]="correctionOriginalAt()"
-              (change)="setCorrectionOriginalAt($any($event.target).value)"
-            />
-          </label>
-          <label>
-            変更後の日時
-            <input
-              type="datetime-local"
-              [value]="correctionCorrectedAt()"
-              (change)="setCorrectionCorrectedAt($any($event.target).value)"
-            />
-          </label>
-          <label>
-            理由（打刻漏れなど）
-            <input
-              type="text"
-              [value]="correctionReason()"
-              (change)="setCorrectionReason($any($event.target).value)"
-            />
-          </label>
-          <div class="form-actions">
-            <button type="button" class="btn btn-primary" (click)="submitCorrectionRequest()" [disabled]="correctionSaving()">
-              管理者に申請する
-            </button>
-            <button type="button" class="btn btn-ghost" (click)="closeCorrectionForm()">キャンセル</button>
+    <!-- ▼ スイッチがオフの時：普段の打刻画面 ▼ -->
+    @if (!showHistory()) {
+      <section class="card">
+        <div class="action-row">
+          <div class="action-buttons">
+            <div class="clock-buttons">
+              <button
+                type="button"
+                class="btn btn-primary btn-lg"
+                (click)="clockIn()"
+                [disabled]="saving() || attendanceService.todayStatus() === 'clockedIn'"
+              >出勤</button>
+              <button
+                type="button"
+                class="btn btn-primary btn-lg"
+                (click)="clockOut()"
+                [disabled]="saving() || attendanceService.todayStatus() === 'notClockedIn'"
+              >退勤</button>
+            </div>
+            <div class="break-buttons">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="breakStart()"
+                [disabled]="saving() || attendanceService.todayStatus() !== 'clockedIn'"
+              >休憩開始</button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="breakEnd()"
+                [disabled]="saving() || attendanceService.todayStatus() !== 'onBreak'"
+              >休憩終了</button>
+            </div>
+          </div>
+          <div class="status-col">
+            <span class="status-badge" [attr.data-status]="attendanceService.todayStatus()">{{ statusLabel() }}</span>
+            <span class="clock-time">{{ nowTimeLabel() }}</span>
           </div>
         </div>
-      }
+        @if (statusMessage()) {
+          <p class="feedback">{{ statusMessage() }}</p>
+        }
+      </section>
 
-      @if (correctionMessage()) {
-        <p class="feedback">{{ correctionMessage() }}</p>
-      }
+      <div class="card-columns">
+        <section class="card">
+          <div class="card-header">
+            <h2>打刻修正申請</h2>
+            <button type="button" class="btn btn-outline" (click)="openCorrectionForm()">申請する</button>
+          </div>
 
-      @if (correctionRequestService.requests().length > 0) {
-        <ul class="request-list">
-          @for (req of correctionRequestService.requests(); track req.id) {
-            <li>
-              <span class="request-type">{{ req.typeLabel }}</span>
-              <span>{{ req.originalLabel }} → {{ req.correctedLabel }}</span>
-              <span class="request-reason">{{ req.reason }}</span>
-              <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
-            </li>
+          @if (showCorrectionForm()) {
+            <div class="correction-form">
+              <label>
+                間違えたボタン
+                <select [value]="correctionType()" (change)="setCorrectionType($any($event.target).value)">
+                  @for (option of correctionTypeOptions; track option.value) {
+                    <option [value]="option.value">{{ option.label }}</option>
+                  }
+                </select>
+              </label>
+              <label>
+                打刻ミスをした日時
+                <input
+                  type="datetime-local"
+                  [value]="correctionOriginalAt()"
+                  (change)="setCorrectionOriginalAt($any($event.target).value)"
+                />
+              </label>
+              <label>
+                変更後の日時
+                <input
+                  type="datetime-local"
+                  [value]="correctionCorrectedAt()"
+                  (change)="setCorrectionCorrectedAt($any($event.target).value)"
+                />
+              </label>
+              <label>
+                理由（打刻漏れなど）
+                <input
+                  type="text"
+                  [value]="correctionReason()"
+                  (change)="setCorrectionReason($any($event.target).value)"
+                />
+              </label>
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary" (click)="submitCorrectionRequest()" [disabled]="correctionSaving()">
+                  管理者に申請する
+                </button>
+                <button type="button" class="btn btn-ghost" (click)="closeCorrectionForm()">キャンセル</button>
+              </div>
+            </div>
           }
-        </ul>
-      }
-    </section>
 
-    <section class="card">
-      <h2>打刻履歴</h2>
-      @if (attendanceService.historyByMonth().length === 0) {
-        <p class="muted">まだ打刻履歴がありません。</p>
-      } @else {
-        @for (month of attendanceService.historyByMonth(); track month.monthKey) {
-          <div class="month-block">
-            <div class="month-heading">
-              <h3>{{ month.monthLabel }}</h3>
-              @if (month.actualWorkDurationLabel) {
-                <span class="duration-chip">月間実労働時間 {{ month.actualWorkDurationLabel }}</span>
+          @if (correctionMessage()) {
+            <p class="feedback">{{ correctionMessage() }}</p>
+          }
+
+          @if (correctionRequestService.requests().length > 0) {
+            <ul class="request-list">
+              @for (req of correctionRequestService.requests(); track req.id) {
+                <li>
+                  <span class="request-type">{{ req.typeLabel }}</span>
+                  <span>{{ req.originalLabel }} → {{ req.correctedLabel }}</span>
+                  <span class="request-reason">{{ req.reason }}</span>
+                  <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <!-- 現在出勤中のメンバー -->
+        <section class="card">
+          <h2>現在出勤中のメンバー</h2>
+          @if (workingMembers().length === 0) {
+            <p class="muted">まだ出勤しているメンバーはいません</p>
+          } @else {
+            <div class="working-members-scroll">
+              @for (member of workingMembers(); track member.uid) {
+                <div class="working-member-card">
+                  <span>{{ member.displayName }}</span>
+                </div>
               }
             </div>
-            @for (day of month.days; track day.dateKey) {
-              <div class="day-block">
-                <div class="day-heading">
-                  <span class="day-date">{{ day.dateLabel }}</span>
-                  <span class="durations">
-                    @if (day.workDurationLabel) {
-                      <span>勤務 {{ day.workDurationLabel }}</span>
-                    }
-                    @if (day.breakDurationLabel) {
-                      <span>休憩 {{ day.breakDurationLabel }}</span>
-                    }
-                    @if (day.actualWorkDurationLabel) {
-                      <span>実働 {{ day.actualWorkDurationLabel }}</span>
-                    }
-                  </span>
-                </div>
-                <ul class="record-list">
-                  @for (record of day.records; track record.timestamp.getTime()) {
-                    <li>
-                      <span class="record-type">{{ record.typeLabel }}</span>
-                      <span>{{ record.timeLabel }}</span>
-                    </li>
+          }
+        </section>
+
+        <!-- 履歴ページへの入り口 -->
+        <section class="card">
+          <div class="card-header">
+            <h2>打刻履歴</h2>
+            <button type="button" class="btn btn-outline" (click)="openHistory()">履歴を見る</button>
+          </div>
+        </section>
+      </div>
+
+    <!-- ▼ スイッチがオンの時：履歴の専用画面 ▼ -->
+    } @else {
+      <section class="card">
+        <div class="card-header" style="margin-bottom: 20px;">
+          <h2>打刻履歴</h2>
+          <button type="button" class="btn btn-outline" (click)="closeHistory()">← 戻る</button>
+        </div>
+
+        <div>
+          @if (attendanceService.historyByMonth().length === 0) {
+            <p class="muted">まだ打刻履歴がありません。</p>
+          } @else {
+            @for (month of attendanceService.historyByMonth(); track month.monthKey) {
+              <div class="month-block">
+                <div class="month-heading">
+                  <h3>{{ month.monthLabel }}</h3>
+                  @if (month.actualWorkDurationLabel) {
+                    <span class="duration-chip">月間実労働時間 {{ month.actualWorkDurationLabel }}</span>
                   }
-                </ul>
+                </div>
+                @for (day of month.days; track day.dateKey) {
+                  <div class="day-block">
+                    <div class="day-heading">
+                      <span class="day-date">{{ day.dateLabel }}</span>
+                      <span class="durations">
+                        @if (day.workDurationLabel) {
+                          <span>勤務 {{ day.workDurationLabel }}</span>
+                        }
+                        @if (day.breakDurationLabel) {
+                          <span>休憩 {{ day.breakDurationLabel }}</span>
+                        }
+                        @if (day.actualWorkDurationLabel) {
+                          <span>実働 {{ day.actualWorkDurationLabel }}</span>
+                        }
+                      </span>
+                    </div>
+                    <ul class="record-list">
+                      @for (record of day.records; track record.timestamp.getTime()) {
+                        <li>
+                          <span class="record-type">{{ record.typeLabel }}</span>
+                          <span>{{ record.timeLabel }}</span>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
               </div>
             }
-          </div>
-        }
-      }
-    </section>
-    </div>
+          }
+        </div>
+      </section>
+    }
+    
   } @else if (!authService.loading()) {
     <section class="card">
       <p class="welcome">出勤簿へようこそ</p>

@@ -1,5 +1,6 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
+import { collection, getDocs, getFirestore, query } from 'firebase/firestore';
 
 import { AttendanceType } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
@@ -51,6 +52,7 @@ export class App {
 
   protected readonly correctionTypeOptions = CORRECTION_TYPE_OPTIONS;
   protected readonly showCorrectionForm = signal(false);
+  protected readonly showHistory = signal(false);
   protected readonly correctionType = signal<AttendanceType>('clockIn');
   protected readonly correctionOriginalAt = signal('');
   protected readonly correctionCorrectedAt = signal('');
@@ -62,9 +64,14 @@ export class App {
   protected readonly nowDateLabel = computed(() => clockDateFormatter.format(this.now()));
   protected readonly nowTimeLabel = computed(() => clockTimeFormatter.format(this.now()));
 
+  protected readonly workingMembers = signal<{ uid: string; displayName: string }[]>([]);
+
   constructor() {
     const intervalId = setInterval(() => this.now.set(new Date()), 1000);
     inject(DestroyRef).onDestroy(() => clearInterval(intervalId));
+    this.loadWorkingMembers();
+    const membersIntervalId = setInterval(() => this.loadWorkingMembers(), 10000);
+    inject(DestroyRef).onDestroy(() => clearInterval(membersIntervalId));
   }
 
   protected login(): void {
@@ -76,11 +83,11 @@ export class App {
   }
 
   protected clockIn(): void {
-    this.record(() => this.attendanceService.clockIn(), '出勤を記録しました');
+    this.record(() => this.attendanceService.clockIn(), 'おはようございます');
   }
 
   protected clockOut(): void {
-    this.record(() => this.attendanceService.clockOut(), '退勤を記録しました');
+    this.record(() => this.attendanceService.clockOut(), 'お疲れさまでした');
   }
 
   protected breakStart(): void {
@@ -97,6 +104,10 @@ export class App {
     try {
       await action();
       this.statusMessage.set(successMessage);
+
+      const utterance = new SpeechSynthesisUtterance(successMessage);
+      utterance.lang = 'ja-JP';
+      speechSynthesis.speak(utterance);
     } catch (err) {
       console.error(err);
       this.statusMessage.set('記録に失敗しました');
@@ -112,6 +123,14 @@ export class App {
 
   protected closeCorrectionForm(): void {
     this.showCorrectionForm.set(false);
+  }
+
+  protected openHistory(): void {
+    this.showHistory.set(true);
+  }
+
+  protected closeHistory(): void {
+    this.showHistory.set(false);
   }
 
   protected setCorrectionType(value: string): void {
@@ -166,6 +185,59 @@ export class App {
       this.correctionMessage.set('申請に失敗しました');
     } finally {
       this.correctionSaving.set(false);
+    }
+  }
+
+  private async loadWorkingMembers(): Promise<void> {
+    try {
+      const db = getFirestore();
+      const usersSnapshot = await getDocs(query(collection(db, 'users')));
+      const working: { uid: string; displayName: string }[] = [];
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+        const userData = userDoc.data();
+        const recordsSnapshot = await getDocs(query(collection(db, 'users', userId, 'attendanceRecords')));
+
+        if (recordsSnapshot.docs.length > 0) {
+          const lastRecord = recordsSnapshot.docs
+            .map(doc => doc.data())
+            .sort((a: any, b: any) => b.timestamp.toDate().getTime() - a.timestamp.toDate().getTime())[0];
+
+          const status = this.getStatus(lastRecord['type'], recordsSnapshot.docs);
+          if (status === 'clockedIn' || status === 'onBreak') {
+            working.push({
+              uid: userId,
+              displayName: userData['displayName'] || 'Unknown'
+            });
+          }
+        }
+      }
+
+      this.workingMembers.set(working);
+    } catch (err) {
+      console.error('Failed to load working members:', err);
+    }
+  }
+
+  private getStatus(_lastType: string, allRecords: any[]): string {
+    const typeCounts: { [key: string]: number } = {};
+    allRecords.forEach(doc => {
+      const type = doc.data()['type'];
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    });
+
+    const clockInCount = typeCounts['clockIn'] || 0;
+    const clockOutCount = typeCounts['clockOut'] || 0;
+    const breakStartCount = typeCounts['breakStart'] || 0;
+    const breakEndCount = typeCounts['breakEnd'] || 0;
+
+    if (clockInCount > clockOutCount && breakStartCount > breakEndCount) {
+      return 'onBreak';
+    } else if (clockInCount > clockOutCount) {
+      return 'clockedIn';
+    } else {
+      return 'clockedOut';
     }
   }
 }
