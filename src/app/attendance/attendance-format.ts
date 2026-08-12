@@ -4,15 +4,8 @@ export interface AttendanceRecord {
   timestamp: Date;
   timeLabel: string;
   typeLabel: string;
-  latitude?: number;  // ← 追加（? は「無い場合もある」という意味です）
-  longitude?: number; // ← 追加
-}
-
-export interface AttendanceRecord {
-  type: AttendanceType;
-  timestamp: Date;
-  timeLabel: string;
-  typeLabel: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 const TYPE_LABELS: Record<AttendanceType, string> = {

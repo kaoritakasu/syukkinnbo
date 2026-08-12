@@ -30,13 +30,10 @@
       @if (isAdmin()) {
         <div class="admin-panel" style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <h3 style="margin-top: 0;">👑 管理者メニュー</h3>
-          @if (pendingCorrectionCount() > 0) {
-            <div
-              style="color: red; font-weight: bold; margin: 10px 0; padding: 10px; background: #fff3f3; border: 1px solid red; border-radius: 4px; cursor: pointer; text-decoration: underline;"
-              (click)="showPendingRequests.set(!showPendingRequests())"
-            >
-              🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
-            </div>
+         @if (pendingCorrectionCount() > 0) {
+  <a routerLink="/admin/requests" class="notification-link" style="color: #d32f2f; font-weight: bold; text-decoration: none;">
+    🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
+  </a>
             <!-- ▼ 未承認リストの表示 ▼ -->
             @if (showPendingRequests()) {
               <div style="margin-top: 20px;">

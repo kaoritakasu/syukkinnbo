@@ -120,7 +120,7 @@ export class AttendanceService {
         limit(HISTORY_LIMIT),
       );
 
-      this.unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
+    this.unsubscribeRecords = onSnapshot(recordsQuery, (snapshot) => {
         this.records.set(
           snapshot.docs
             .filter((doc) => doc.data()['timestamp'])
@@ -133,13 +133,14 @@ export class AttendanceService {
                 timestamp,
                 timeLabel: timeFormatter.format(timestamp),
                 typeLabel: getTypeLabel(type),
+                latitude: data['latitude'],   // ← ★この行があるか確認！（無ければ追加）
+                longitude: data['longitude'], // ← ★この行があるか確認！（無ければ追加）
               };
             }),
         );
       });
-    });
-  }
-
+   });
+  }  
   clockIn(): Promise<void> {
     return this.record('clockIn');
   }
