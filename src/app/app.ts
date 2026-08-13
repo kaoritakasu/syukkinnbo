@@ -90,6 +90,8 @@ export class App {
   protected readonly workingMembers = signal<{ uid: string; displayName: string }[]>([]);
   protected readonly router = inject(Router);
   protected readonly currentRoute = signal<string>('/');
+  protected readonly hasPunchedInToday = signal(false);
+  protected readonly hasPunchedOutToday = signal(false);
 
   constructor() {
     const intervalId = setInterval(() => this.now.set(new Date()), 1000);
@@ -194,10 +196,12 @@ export class App {
   }
 
   protected clockIn(): void {
+    if (this.hasPunchedInToday()) return;
     this.record(() => this.attendanceService.clockIn(), 'おはようございます');
   }
 
   protected clockOut(): void {
+    if (this.hasPunchedOutToday()) return;
     this.record(() => this.attendanceService.clockOut(), 'お疲れさまでした');
   }
 
@@ -215,6 +219,12 @@ export class App {
     try {
       await action();
       this.statusMessage.set(successMessage);
+
+      if (successMessage === 'おはようございます') {
+        this.hasPunchedInToday.set(true);
+      } else if (successMessage === 'お疲れさまでした') {
+        this.hasPunchedOutToday.set(true);
+      }
 
       const utterance = new SpeechSynthesisUtterance(successMessage);
       utterance.lang = 'ja-JP';

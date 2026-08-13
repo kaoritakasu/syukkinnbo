@@ -19,7 +19,7 @@
   </div>
 </header>
 
-@if (currentRoute() !== '/admin') {
+@if (!currentRoute().startsWith('/admin')) {
 <main class="content">
   @if (authService.user()) {
 
@@ -36,7 +36,7 @@
           }
           
           <!-- ▼ 全員の履歴を見るボタン ▼ -->
-          <a routerLink="/admin" class="btn btn-outline" style="text-decoration: none; display: inline-block; background: white; padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; color: #333; cursor: pointer;">
+          <a routerLink="/admin" class="btn btn-outline" style="text-decoration: none; display: inline-block; background: white; padding: 8px 16px; border: 1px solid #ccc; border-radius: 50px; color: #333; cursor: pointer;">
             👥 全員の履歴を見る
           </a>
           
@@ -50,13 +50,17 @@
                 type="button"
                 class="btn btn-primary btn-lg"
                 (click)="clockIn()"
-                [disabled]="saving() || attendanceService.todayStatus() === 'clockedIn' || attendanceService.todayStatus() === 'onBreak'"
+                [disabled]="saving() || hasPunchedInToday() || attendanceService.todayStatus() === 'clockedIn' || attendanceService.todayStatus() === 'onBreak'"
+                [style.opacity]="hasPunchedInToday() ? '0.5' : '1'"
+                [style.cursor]="hasPunchedInToday() ? 'not-allowed' : 'pointer'"
               >出勤</button>
               <button
                 type="button"
                 class="btn btn-primary btn-lg"
                 (click)="clockOut()"
-                [disabled]="saving() || attendanceService.todayStatus() === 'notClockedIn' || attendanceService.todayStatus() === 'onBreak'"
+                [disabled]="saving() || hasPunchedOutToday() || attendanceService.todayStatus() === 'notClockedIn' || attendanceService.todayStatus() === 'onBreak'"
+                [style.opacity]="hasPunchedOutToday() ? '0.5' : '1'"
+                [style.cursor]="hasPunchedOutToday() ? 'not-allowed' : 'pointer'"
               >退勤</button>
             </div>
             <div class="break-buttons">
@@ -227,9 +231,6 @@
                               @for (record of day.records; track record.timestamp.getTime()) {
                                 <span style="background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; display: inline-flex; align-items: center; gap: 4px;">
                                   {{ record.typeLabel }} {{ record.timeLabel }}
-                                  @if (record.latitude && record.longitude) {
-                                    <a [href]="'https://maps.google.com/?q=' + record.latitude + ',' + record.longitude" target="_blank" style="text-decoration: none;" title="打刻場所をマップで見る">📍</a>
-                                  }
                                 </span>
                               }
                               @if (day.records.length === 0) {

@@ -163,34 +163,32 @@ export class AttendanceService {
       throw new Error('ログインしていません');
     }
 
-    // ▼ GPSを取得する処理を追加
     const position = await this.getCurrentPosition();
 
     const recordsRef = collection(firestore, 'users', user.uid, 'attendanceRecords');
-    
-    // ▼ 保存するデータを組み立てる
+
     const recordData: any = {
       type,
       timestamp: serverTimestamp(),
     };
 
     if (position) {
-      recordData.latitude = position.coords.latitude;
-      recordData.longitude = position.coords.longitude;
+      recordData.latitude = position.lat;
+      recordData.longitude = position.lng;
     }
 
     await addDoc(recordsRef, recordData);
   }
 
-private getCurrentPosition(): Promise<GeolocationPosition | null> {
+private getCurrentPosition(): Promise<{ lat: number; lng: number } | null> {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
-        resolve(null); // GPS非対応ブラウザ
+        resolve(null);
       } else {
         navigator.geolocation.getCurrentPosition(
-          (pos) => resolve(pos),
-          (err) => resolve(null), // ユーザーが「許可しない」を押した時はエラーにせずスキップ
-          { timeout: 5000, maximumAge: 0 } // 最大5秒待機
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          (err) => resolve(null),
+          { timeout: 5000, maximumAge: 0 }
         );
       }
     });

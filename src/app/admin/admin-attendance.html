@@ -28,6 +28,7 @@
               <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
                 <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 100px; font-weight: 600; font-size: 13px;">日付</th>
                 <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; font-weight: 600; font-size: 13px;">打刻記録</th>
+                <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 100px; font-weight: 600; font-size: 13px;">位置情報</th>
                 <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 80px; font-weight: 600; font-size: 13px;">休憩</th>
                 <th style="padding: 12px; text-align: left; width: 80px; font-weight: 600; font-size: 13px;">実働</th>
               </tr>
@@ -43,6 +44,15 @@
                           <span style="font-weight: 500;">{{ record.typeLabel }}</span>
                           <span>{{ record.timeLabel }}</span>
                         </span>
+                      }
+                    </div>
+                  </td>
+                  <td style="padding: 12px; border-right: 1px solid #eee; font-size: 13px;">
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      @for (record of day.records; track record.timestamp.getTime()) {
+                        @if (record.latitude && record.longitude) {
+                          <a [href]="'https://maps.google.com/?q=' + record.latitude + ',' + record.longitude" target="_blank" style="color: #1976d2; text-decoration: none; font-weight: 500;">📍 マップ</a>
+                        }
                       }
                     </div>
                   </td>

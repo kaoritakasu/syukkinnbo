@@ -24,6 +24,8 @@ interface RawRecord {
   uid: string;
   type: AttendanceType;
   timestamp: Date;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface AdminUserHistory {
@@ -71,6 +73,8 @@ export class AdminAttendanceService {
         timestamp: record.timestamp,
         timeLabel: timeFormatter.format(record.timestamp),
         typeLabel: getTypeLabel(record.type),
+        latitude: record.latitude,
+        longitude: record.longitude,
       });
     }
 
@@ -115,6 +119,8 @@ export class AdminAttendanceService {
             uid: recordDoc.ref.parent.parent!.id,
             type: recordDoc.data()['type'] as AttendanceType,
             timestamp: recordDoc.data()['timestamp'].toDate(),
+            latitude: recordDoc.data()['latitude'],
+            longitude: recordDoc.data()['longitude'],
           })),
       );
     });
