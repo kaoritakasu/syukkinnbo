@@ -19,19 +19,27 @@
   </div>
 </header>
 
+@if (currentRoute() !== '/admin') {
 <main class="content">
   @if (authService.user()) {
 
     <!-- ▼ スイッチがオフの時：普段の打刻画面 ▼ -->
     @if (!showHistory()) {
-      @if (isAdmin()) {
+     @if (isAdmin()) {
         <div class="admin-panel" style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <h3 style="margin-top: 0;">👑 管理者メニュー</h3>
-         @if (pendingCorrectionCount() > 0) {
- <a (click)="showAdminPopup.set(true)" style="cursor: pointer; color: #d32f2f; font-weight: bold; text-decoration: none;">
-  🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
-</a>
+          
+          @if (pendingCorrectionCount() > 0) {
+            <a (click)="showAdminPopup.set(true)" style="cursor: pointer; color: #d32f2f; font-weight: bold; text-decoration: none; display: block; margin-bottom: 15px;">
+              🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
+            </a>
           }
+          
+          <!-- ▼ 全員の履歴を見るボタン ▼ -->
+          <a routerLink="/admin" class="btn btn-outline" style="text-decoration: none; display: inline-block; background: white; padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; color: #333; cursor: pointer;">
+            👥 全員の履歴を見る
+          </a>
+          
         </div>
       }
       <section class="card">
@@ -80,7 +88,10 @@
         <section class="card">
           <div class="card-header">
             <h2>打刻修正申請</h2>
-            <button type="button" class="btn btn-outline" (click)="openCorrectionForm()">申請する</button>
+            <div style="display: flex; gap: 10px;">
+              <button type="button" class="btn btn-outline" (click)="openRequestHistory()">申請履歴を見る</button>
+              <button type="button" class="btn btn-outline" (click)="openCorrectionForm()">申請する</button>
+            </div>
           </div>
 
           @if (showCorrectionForm()) {
@@ -128,19 +139,6 @@
 
           @if (correctionMessage()) {
             <p class="feedback">{{ correctionMessage() }}</p>
-          }
-
-          @if (correctionRequestService.requests().length > 0) {
-            <ul class="request-list">
-              @for (req of correctionRequestService.requests(); track req.id) {
-                <li>
-                  <span class="request-type">{{ req.typeLabel }}</span>
-                  <span>{{ req.originalLabel }} → {{ req.correctedLabel }}</span>
-                  <span class="request-reason">{{ req.reason }}</span>
-                  <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
-                </li>
-              }
-            </ul>
           }
         </section>
 
@@ -204,41 +202,56 @@
                   }
                 </div>
 
-                @for (day of month.days; track day.dateKey) {
-                  <div class="day-block">
-                    <div class="day-heading">
-                      <span class="day-date">{{ day.dateLabel }}</span>
-                      <span class="durations">
-                        @if (day.workDurationLabel) {
-                          <span>勤務 {{ day.workDurationLabel }}</span>
-                        }
-                        @if (day.breakDurationLabel) {
-                          <span>休憩 {{ day.breakDurationLabel }}</span>
-                        }
-                        @if (day.actualWorkDurationLabel) {
-                          <span>実働 {{ day.actualWorkDurationLabel }}</span>
-                        }
-                      </span>
-                    </div>
-                   <ul class="record-list">
-  @for (record of day.records; track record.timestamp.getTime()) {
-    <li>
-      <span class="record-type">{{ record.typeLabel }}</span>
-      <span>{{ record.timeLabel }}</span>
-      <!-- ▼ ここから追加 ▼ -->
-      @if (record.latitude && record.longitude) {
-        <a 
-          [href]="'https://maps.google.com/?q=' + record.latitude + ',' + record.longitude" 
-          target="_blank" 
-          style="text-decoration: none;"
-          title="打刻した場所をマップで見る"
-        >📍</a>
-      }
-                        </li>
+                <!-- ★ 1日1行のテーブル表示 ★ -->
+                <div style="overflow-x: auto; margin-top: 20px;">
+                  <table style="width: 100%; border-collapse: collapse; min-width: 600px; text-align: left; font-size: 0.95em;">
+                    <thead>
+                      <tr style="background: #f9f9f9; border-bottom: 2px solid #ddd;">
+                        <th style="padding: 12px 10px; white-space: nowrap;">日付</th>
+                        <th style="padding: 12px 10px;">打刻記録 (出勤/退勤/休憩など)</th>
+                        <th style="padding: 12px 10px; white-space: nowrap;">休憩</th>
+                        <th style="padding: 12px 10px; white-space: nowrap;">実働</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (day of month.days; track day.dateKey) {
+                        <tr style="border-bottom: 1px solid #eee;">
+                          <!-- 日付 -->
+                          <td style="padding: 12px 10px; font-weight: bold; white-space: nowrap;">
+                            {{ day.dateLabel }}
+                          </td>
+                          
+                          <!-- 打刻記録を横並びのバッジで表示 -->
+                          <td style="padding: 12px 10px;">
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                              @for (record of day.records; track record.timestamp.getTime()) {
+                                <span style="background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; display: inline-flex; align-items: center; gap: 4px;">
+                                  {{ record.typeLabel }} {{ record.timeLabel }}
+                                  @if (record.latitude && record.longitude) {
+                                    <a [href]="'https://maps.google.com/?q=' + record.latitude + ',' + record.longitude" target="_blank" style="text-decoration: none;" title="打刻場所をマップで見る">📍</a>
+                                  }
+                                </span>
+                              }
+                              @if (day.records.length === 0) {
+                                <span style="color: #999; font-size: 0.85em;">記録なし</span>
+                              }
+                            </div>
+                          </td>
+                          
+                          <!-- 休憩時間 -->
+                          <td style="padding: 12px 10px; white-space: nowrap; color: #666;">
+                            {{ day.breakDurationLabel || '-' }}
+                          </td>
+                          
+                          <!-- 実働時間 -->
+                          <td style="padding: 12px 10px; white-space: nowrap; font-weight: bold;">
+                            {{ day.actualWorkDurationLabel || '-' }}
+                          </td>
+                        </tr>
                       }
-                    </ul>
-                  </div>
-                }
+                    </tbody>
+                  </table>
+                </div>
               </div>
             }
           }
@@ -262,9 +275,7 @@
           style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"
           (click)="showAdminPopup.set(false)"
           title="閉じる"
-        >
-          ✖
-        </button>
+        >✖</button>
 
         <h2 style="margin-top: 0; margin-bottom: 20px;">未承認の打刻修正申請</h2>
 
@@ -301,18 +312,14 @@
                     (click)="approveRequest(request)"
                     [disabled]="reviewingRequestId() === request.id"
                     style="flex: 1;"
-                  >
-                    ✓ 承認
-                  </button>
+                  >✓ 承認</button>
                   <button
                     type="button"
                     class="btn btn-danger"
                     (click)="rejectRequest(request)"
                     [disabled]="reviewingRequestId() === request.id"
                     style="flex: 1; background: #d32f2f; color: white;"
-                  >
-                    ✗ 却下
-                  </button>
+                  >✗ 却下</button>
                 </div>
               </div>
             }
@@ -321,4 +328,66 @@
       </div>
     </div>
   }
+
+  <!-- ▼ 一般ユーザー向け：審査結果のお知らせポップアップ ▼ -->
+  @if (showResultPopup()) {
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+      <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+        
+        <h2 style="margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;">🔔 打刻修正の結果</h2>
+        <p style="margin-bottom: 20px;">管理者があなたの申請を確認しました。</p>
+
+        @for (req of reviewedRequests(); track req.id) {
+          <div style="margin-bottom: 15px; padding: 15px; border-radius: 8px; border: 1px solid #ddd;"
+               [style.background]="req.status === 'approved' ? '#e8f5e9' : '#ffebee'">
+               
+            <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 10px;"
+                 [style.color]="req.status === 'approved' ? '#2e7d32' : '#c62828'">
+              {{ req.status === 'approved' ? '✅ 承認されました' : '❌ 却下されました' }}
+            </div>
+            
+            <div><span style="color: #666;">対象: </span>{{ typeLabels[req.type] }}</div>
+            <div><span style="color: #666;">理由: </span>{{ req.reason }}</div>
+          </div>
+        }
+
+        <div style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-primary" (click)="closeResultPopup()">確認しました</button>
+        </div>
+
+      </div>
+    </div>
+  }
+
+  <!-- ▼ 申請履歴モーダル ▼ -->
+  @if (showRequestHistory()) {
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+      <div style="background: white; border-radius: 8px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; position: relative;">
+        
+        <button type="button" (click)="closeRequestHistory()" title="閉じる" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+          ✖
+        </button>
+        
+        <h2 style="margin-top: 0; margin-bottom: 20px;">申請履歴</h2>
+
+        @if (correctionRequestService.requests().length === 0) {
+          <p style="color: #999; text-align: center;">申請履歴はありません</p>
+        } @else {
+          <ul class="request-list">
+            @for (req of correctionRequestService.requests(); track req.id) {
+              <li>
+                <span class="request-type">{{ req.typeLabel }}</span>
+                <span>{{ req.originalLabel }} → {{ req.correctedLabel }}</span>
+                <span class="request-reason">{{ req.reason }}</span>
+                <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </div>
+  }
 </main>
+} @else {
+  <router-outlet></router-outlet>
+}

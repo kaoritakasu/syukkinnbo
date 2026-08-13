@@ -1,5 +1,8 @@
 import { Component, DestroyRef, computed, inject, signal, effect } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router, RouterLink, RouterOutlet, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 
 import { AttendanceType } from './attendance/attendance-format';
@@ -34,7 +37,7 @@ const clockTimeFormatter = new Intl.DateTimeFormat('ja-JP', {
   second: '2-digit',
 });
 
-const STATUS_LABELS = {
+const STATUS_LABELS: any = {
   notClockedIn: '未出勤',
   clockedIn: '出勤中',
   onBreak: '休憩中',
@@ -43,7 +46,7 @@ const STATUS_LABELS = {
 
 @Component({
   selector: 'app-root',
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -57,6 +60,12 @@ export class App {
   protected readonly pendingRequests = signal<any[]>([]);
   protected readonly showPendingRequests = signal(false);
   protected readonly showAdminPopup = signal(false);
+  protected readonly showResultPopup = signal(false);
+  
+  // ▼ これが足りなかったスイッチ（変数） ▼
+  protected readonly showRequestHistory = signal(false);
+  
+  protected readonly reviewedRequests = signal<any[]>([]);
   private unsubscribePendingRequests: any = null;
   protected readonly saving = signal(false);
   protected readonly reviewingRequestId = signal<string | null>(null);
@@ -79,6 +88,8 @@ export class App {
   protected readonly nowTimeLabel = computed(() => clockTimeFormatter.format(this.now()));
 
   protected readonly workingMembers = signal<{ uid: string; displayName: string }[]>([]);
+  protected readonly router = inject(Router);
+  protected readonly currentRoute = signal<string>('/');
 
   constructor() {
     const intervalId = setInterval(() => this.now.set(new Date()), 1000);
@@ -86,23 +97,27 @@ export class App {
     this.loadWorkingMembers();
     const membersIntervalId = setInterval(() => this.loadWorkingMembers(), 10000);
     inject(DestroyRef).onDestroy(() => clearInterval(membersIntervalId));
-    
+
+    this.router.events
+      .pipe(
+        filter(event => event instanceof NavigationEnd),
+        takeUntilDestroyed()
+      )
+      .subscribe((event: any) => {
+        this.currentRoute.set(event.url);
+      });
+
     effect(() => {
-      // 管理者としてログインしている時だけ動かす
       if (this.isAdmin()) {
         const db = getFirestore();
-        // 全ユーザーの申請データから「pending（承認待ち）」だけを探す
         const pendingQuery = query(
           collectionGroup(db, 'correctionRequests'),
           where('status', '==', 'pending')
         );
 
-        // onSnapshotでリアルタイム監視スタート！
         this.unsubscribePendingRequests = onSnapshot(pendingQuery, async (snapshot) => {
-          // 見つかった件数を signal にセットする
           this.pendingCorrectionCount.set(snapshot.docs.length);
 
-          // 詳細データを取得（displayNameを含む）
           const requests = await Promise.all(
             snapshot.docs.map(async (docSnap) => {
               const data = docSnap.data();
@@ -138,14 +153,33 @@ export class App {
           this.pendingRequests.set(requests);
         });
       } else {
-        // 管理者じゃない場合は監視をストップして件数を0にする
         if (this.unsubscribePendingRequests) {
           this.unsubscribePendingRequests();
         }
         this.pendingCorrectionCount.set(0);
+
+        const user = this.authService.user();
+        if (user) {
+          const db = getFirestore();
+          const requestsRef = collection(db, 'users', user.uid, 'correctionRequests');
+          const q = query(requestsRef, where('status', 'in', ['approved', 'rejected']));
+
+          onSnapshot(q, (snapshot) => {
+            const seenIds = JSON.parse(localStorage.getItem('seenRequestIds') || '[]');
+
+            const unnotified = snapshot.docs
+              .map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
+              .filter((data: any) => !seenIds.includes(data.id));
+
+            if (unnotified.length > 0) {
+              this.reviewedRequests.set(unnotified);
+              this.showResultPopup.set(true);
+            }
+          });
+        }
       }
     });
-  } 
+  }
 
   protected login(): void {
     this.authService.loginWithGoogle().catch((err) => console.error(err));
@@ -153,6 +187,10 @@ export class App {
 
   protected logout(): void {
     this.authService.logout().catch((err) => console.error(err));
+  }
+
+  protected navigateToAdmin(): void {
+    this.router.navigate(['/admin']);
   }
 
   protected clockIn(): void {
@@ -341,19 +379,16 @@ export class App {
     try {
       const db = getFirestore();
       const recordsRef = collection(db, 'users', request.userId, 'attendanceRecords');
-      
-      // ① まずは「出勤」「退勤」などのタイプだけで対象の履歴を取得する
+
       const recordQuery = query(
         recordsRef,
         where('type', '==', request.type)
       );
       const recordSnapshot = await getDocs(recordQuery);
 
-      // ② 取得したデータの中から、年月日時分が「1分以内の誤差」のものを探す（秒・ミリ秒のズレを吸収）
       const targetTimeMs = request.originalAt.getTime();
       const originalRecord = recordSnapshot.docs.find(doc => {
         const recordTimeMs = doc.data()['timestamp'].toDate().getTime();
-        // 誤差が60000ミリ秒（1分）以内なら同一の打刻とみなす
         return Math.abs(recordTimeMs - targetTimeMs) <= 60000;
       });
 
@@ -366,13 +401,11 @@ export class App {
 
       const batch = writeBatch(db);
 
-      // ③ 打刻データを上書き（correctedFrom には実際の元の時間をセット）
       batch.update(originalRecord.ref, {
         timestamp: request.correctedAtTimestamp,
-        correctedFrom: originalRecord.data()['timestamp'], 
+        correctedFrom: originalRecord.data()['timestamp'],
       });
 
-      // ④ 修正申請自体のステータスを更新
       const requestRef = doc(db, 'users', request.userId, 'correctionRequests', request.id);
       batch.update(requestRef, {
         status: 'approved',
@@ -381,12 +414,36 @@ export class App {
       });
 
       await batch.commit();
-      
+
     } catch (err) {
       console.error('Failed to approve request:', err);
       alert('承認処理中にエラーが発生しました。');
     } finally {
       this.reviewingRequestId.set(null);
     }
+  }
+
+  protected closeResultPopup(): void {
+    this.showResultPopup.set(false);
+
+    const seenIds = JSON.parse(localStorage.getItem('seenRequestIds') || '[]');
+
+    for (const req of this.reviewedRequests()) {
+      if (!seenIds.includes(req.id)) {
+        seenIds.push(req.id);
+      }
+    }
+
+    localStorage.setItem('seenRequestIds', JSON.stringify(seenIds));
+    this.reviewedRequests.set([]);
+  }
+
+  // ▼ これが足りなかった関数 ▼
+  protected openRequestHistory(): void {
+    this.showRequestHistory.set(true);
+  }
+
+  protected closeRequestHistory(): void {
+    this.showRequestHistory.set(false);
   }
 }

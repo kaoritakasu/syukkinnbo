@@ -4,42 +4,6 @@
 </header>
 
 <main class="content">
-  <section class="card">
-    <h2>打刻修正申請</h2>
-    @if (reviewMessage()) {
-      <p class="feedback">{{ reviewMessage() }}</p>
-    }
-    @if (pendingCorrectionRequests().length === 0) {
-      <p class="muted">申請中の依頼はありません。</p>
-    } @else {
-      <ul class="request-list">
-        @for (req of pendingCorrectionRequests(); track req.id) {
-          <li>
-            <span class="request-type">{{ req.displayName }}</span>
-            <span>{{ req.typeLabel }} {{ req.originalLabel }} → {{ req.correctedLabel }}</span>
-            <span class="request-reason">{{ req.reason }}</span>
-            <button type="button" class="btn btn-primary" (click)="approve(req.uid, req.id)">許可</button>
-            <button type="button" class="btn btn-ghost" (click)="reject(req.uid, req.id)">却下</button>
-          </li>
-        }
-      </ul>
-    }
-
-    @if (reviewedCorrectionRequests().length > 0) {
-      <h3 class="reviewed-heading">対応済みの申請</h3>
-      <ul class="request-list">
-        @for (req of reviewedCorrectionRequests(); track req.id) {
-          <li>
-            <span class="request-type">{{ req.displayName }}</span>
-            <span>{{ req.typeLabel }} {{ req.originalLabel }} → {{ req.correctedLabel }}</span>
-            <span class="request-reason">{{ req.reason }}</span>
-            <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
-          </li>
-        }
-      </ul>
-    }
-  </section>
-
   @if (adminAttendanceService.historyByUser().length === 0) {
     <section class="card">
       <p class="muted">まだ打刻データがありません。</p>
@@ -56,32 +20,39 @@
                 <span class="duration-chip">月間実労働時間 {{ month.actualWorkDurationLabel }}</span>
               }
             </div>
-            @for (day of month.days; track day.dateKey) {
-              <div class="day-block">
-                <div class="day-heading">
-                  <span class="day-date">{{ day.dateLabel }}</span>
-                  <span class="durations">
-                    @if (day.workDurationLabel) {
-                      <span>勤務 {{ day.workDurationLabel }}</span>
-                    }
-                    @if (day.breakDurationLabel) {
-                      <span>休憩 {{ day.breakDurationLabel }}</span>
-                    }
-                    @if (day.actualWorkDurationLabel) {
-                      <span>実働 {{ day.actualWorkDurationLabel }}</span>
-                    }
-                  </span>
-                </div>
-                <ul class="record-list">
-                  @for (record of day.records; track record.timestamp.getTime()) {
-                    <li>
-                      <span class="record-type">{{ record.typeLabel }}</span>
-                      <span>{{ record.timeLabel }}</span>
-                    </li>
-                  }
-                </ul>
-              </div>
-            }
+
+            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden;">
+              <thead>
+                <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                  <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 100px; font-weight: 600; font-size: 13px;">日付</th>
+                  <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; font-weight: 600; font-size: 13px;">打刻記録</th>
+                  <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 80px; font-weight: 600; font-size: 13px;">休憩</th>
+                  <th style="padding: 12px; text-align: left; width: 80px; font-weight: 600; font-size: 13px;">実働</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (day of month.days; track day.dateKey) {
+                  <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px; border-right: 1px solid #eee; font-size: 13px;">{{ day.dateLabel }}</td>
+                    <td style="padding: 12px; border-right: 1px solid #eee;">
+                      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        @for (record of day.records; track record.timestamp.getTime()) {
+                          <span style="background: #e3f2fd; padding: 4px 10px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
+                            <span style="font-weight: 500;">{{ record.typeLabel }}</span>
+                            <span>{{ record.timeLabel }}</span>
+                            @if (record.latitude && record.longitude) {
+                              <a [href]="'https://maps.google.com/?q=' + record.latitude + ',' + record.longitude" target="_blank" style="text-decoration: none; color: #0066cc;">📍</a>
+                            }
+                          </span>
+                        }
+                      </div>
+                    </td>
+                    <td style="padding: 12px; border-right: 1px solid #eee; font-size: 13px; text-align: center;">{{ day.breakDurationLabel }}</td>
+                    <td style="padding: 12px; font-size: 13px; text-align: center; font-weight: 500;">{{ day.actualWorkDurationLabel }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
         }
       </section>
