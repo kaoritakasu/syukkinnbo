@@ -12,9 +12,6 @@
       <span class="muted">読み込み中...</span>
     } @else if (authService.user(); as user) {
       <span class="user-name">{{ user.displayName }}</span>
-      @if (authService.isAdmin()) {
-        <a class="topbar-link" routerLink="/admin">管理者用一覧</a>
-      }
       <button type="button" class="btn btn-ghost" (click)="logout()">ログアウト</button>
     } @else {
       <button type="button" class="btn btn-primary" (click)="login()">Googleでログイン</button>
@@ -31,58 +28,9 @@
         <div class="admin-panel" style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <h3 style="margin-top: 0;">👑 管理者メニュー</h3>
          @if (pendingCorrectionCount() > 0) {
-  <a routerLink="/admin/requests" class="notification-link" style="color: #d32f2f; font-weight: bold; text-decoration: none;">
-    🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
-  </a>
-            <!-- ▼ 未承認リストの表示 ▼ -->
-            @if (showPendingRequests()) {
-              <div style="margin-top: 20px;">
-                @for (request of pendingRequests(); track request.id) {
-                <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                    <div style="flex: 1;">
-                      <div style="font-weight: bold; margin-bottom: 5px;">
-                        <span style="color: #666;">ユーザー: </span>
-                        <span>{{ request.userId }}</span>
-                      </div>
-                      <div style="margin-bottom: 5px;">
-                        <span style="color: #666;">対象: </span>
-                        <span style="background: #e3f2fd; padding: 2px 8px; border-radius: 4px;">{{ typeLabels[request.type] }}</span>
-                      </div>
-                      <div style="margin-bottom: 5px;">
-                        <span style="color: #666;">修正内容: </span>
-                        <span>{{ request.originalAt | date: 'M/d HH:mm:ss' }} → {{ request.correctedAt | date: 'M/d HH:mm:ss' }}</span>
-                      </div>
-                      <div style="margin-bottom: 10px;">
-                        <span style="color: #666;">理由: </span>
-                        <span style="color: #333; font-style: italic;">{{ request.reason }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style="display: flex; gap: 10px;">
-                    <button
-                      type="button"
-                      class="btn btn-primary"
-                      (click)="approveRequest(request)"
-                      [disabled]="reviewingRequestId() === request.id"
-                      style="flex: 1;"
-                    >
-                      ✓ 承認
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-danger"
-                      (click)="rejectRequest(request)"
-                      [disabled]="reviewingRequestId() === request.id"
-                      style="flex: 1; background: #d32f2f; color: white;"
-                    >
-                      ✗ 却下
-                    </button>
-                  </div>
-                </div>
-                }
-              </div>
-            }
+ <a (click)="showAdminPopup.set(true)" style="cursor: pointer; color: #d32f2f; font-weight: bold; text-decoration: none;">
+  🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
+</a>
           }
         </div>
       }
@@ -304,6 +252,73 @@
       <p class="muted">ログインすると出退勤の記録・履歴を確認できます。</p>
     </section>
   }
-</main>
 
-<router-outlet />
+  <!-- ▼ 管理者用モーダル：未承認申請一覧 ▼ -->
+  @if (showAdminPopup()) {
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+      <div style="background: white; border-radius: 8px; padding: 30px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;">
+        <button
+          type="button"
+          style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"
+          (click)="showAdminPopup.set(false)"
+          title="閉じる"
+        >
+          ✖
+        </button>
+
+        <h2 style="margin-top: 0; margin-bottom: 20px;">未承認の打刻修正申請</h2>
+
+        @if (pendingRequests().length === 0) {
+          <p style="color: #999; text-align: center;">承認待ちの申請はありません</p>
+        } @else {
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            @for (request of pendingRequests(); track request.id) {
+              <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                  <div style="flex: 1;">
+                    <div style="font-weight: bold; margin-bottom: 5px;">
+                      <span style="color: #666;">ユーザー: </span>
+                      <span>{{ request.userDisplayName }}</span>
+                    </div>
+                    <div style="margin-bottom: 5px;">
+                      <span style="color: #666;">対象: </span>
+                      <span style="background: #e3f2fd; padding: 2px 8px; border-radius: 4px;">{{ typeLabels[request.type] }}</span>
+                    </div>
+                    <div style="margin-bottom: 5px;">
+                      <span style="color: #666;">修正内容: </span>
+                      <span>{{ request.originalAt | date: 'M/d HH:mm:ss' }} → {{ request.correctedAt | date: 'M/d HH:mm:ss' }}</span>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                      <span style="color: #666;">理由: </span>
+                      <span style="color: #333; font-style: italic;">{{ request.reason }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    (click)="approveRequest(request)"
+                    [disabled]="reviewingRequestId() === request.id"
+                    style="flex: 1;"
+                  >
+                    ✓ 承認
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    (click)="rejectRequest(request)"
+                    [disabled]="reviewingRequestId() === request.id"
+                    style="flex: 1; background: #d32f2f; color: white;"
+                  >
+                    ✗ 却下
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</main>

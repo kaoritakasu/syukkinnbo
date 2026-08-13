@@ -9,5 +9,7 @@ export const adminGuard: CanActivateFn = async () => {
 
   await authService.ready();
 
-  return authService.isAdmin() ? true : router.createUrlTree(['/']);
+  const isAdmin = authService.isAdmin();
+  console.log('[DEBUG adminGuard] Guard から返す値:', isAdmin ? 'true (許可)' : 'false / UrlTree (拒否)');
+  return isAdmin ? true : router.createUrlTree(['/']);
 };

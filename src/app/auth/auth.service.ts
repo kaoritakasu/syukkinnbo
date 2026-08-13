@@ -22,7 +22,11 @@ export class AuthService {
 
   readonly isAdmin = computed(() => {
     const email = this.user()?.email;
-    return !!email && environment.adminEmails.includes(email);
+    const result = !!email && environment.adminEmails.includes(email);
+    console.log('[DEBUG isAdmin] ユーザーメール:', email);
+    console.log('[DEBUG isAdmin] environment.adminEmails:', environment.adminEmails);
+    console.log('[DEBUG isAdmin] 判定結果:', result);
+    return result;
   });
 
   private resolveReady!: () => void;

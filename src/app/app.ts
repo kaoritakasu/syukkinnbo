@@ -1,7 +1,6 @@
 import { Component, DestroyRef, computed, inject, signal, effect } from '@angular/core';
-import { RouterLink, RouterOutlet } from '@angular/router';
 import { DatePipe } from '@angular/common';
-import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 
 import { AttendanceType } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
@@ -44,7 +43,7 @@ const STATUS_LABELS = {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, DatePipe],
+  imports: [DatePipe],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -57,6 +56,7 @@ export class App {
   protected readonly pendingCorrectionCount = signal<number>(0);
   protected readonly pendingRequests = signal<any[]>([]);
   protected readonly showPendingRequests = signal(false);
+  protected readonly showAdminPopup = signal(false);
   private unsubscribePendingRequests: any = null;
   protected readonly saving = signal(false);
   protected readonly reviewingRequestId = signal<string | null>(null);
@@ -98,27 +98,43 @@ export class App {
         );
 
         // onSnapshotでリアルタイム監視スタート！
-        this.unsubscribePendingRequests = onSnapshot(pendingQuery, (snapshot) => {
+        this.unsubscribePendingRequests = onSnapshot(pendingQuery, async (snapshot) => {
           // 見つかった件数を signal にセットする
           this.pendingCorrectionCount.set(snapshot.docs.length);
 
-          // 詳細データを取得
-          const requests = snapshot.docs.map(docSnap => {
-            const data = docSnap.data();
-            const userId = docSnap.ref.parent?.parent?.id;
-            return {
-              id: docSnap.id,
-              userId,
-              type: data['type'],
-              originalAt: data['originalAt'].toDate(),
-              originalAtTimestamp: data['originalAt'],
-              correctedAt: data['correctedAt'].toDate(),
-              correctedAtTimestamp: data['correctedAt'],
-              reason: data['reason'],
-              status: data['status'],
-              createdAt: data['createdAt'].toDate(),
-            };
-          });
+          // 詳細データを取得（displayNameを含む）
+          const requests = await Promise.all(
+            snapshot.docs.map(async (docSnap) => {
+              const data = docSnap.data();
+              const userId = docSnap.ref.parent?.parent?.id;
+
+              let userDisplayName = '不明なユーザー';
+              if (userId) {
+                try {
+                  const userDoc = await getDoc(doc(db, 'users', userId));
+                  if (userDoc.exists()) {
+                    userDisplayName = userDoc.data()['displayName'] || '不明なユーザー';
+                  }
+                } catch (err) {
+                  console.error('Failed to load user:', err);
+                }
+              }
+
+              return {
+                id: docSnap.id,
+                userId,
+                userDisplayName,
+                type: data['type'],
+                originalAt: data['originalAt'].toDate(),
+                originalAtTimestamp: data['originalAt'],
+                correctedAt: data['correctedAt'].toDate(),
+                correctedAtTimestamp: data['correctedAt'],
+                reason: data['reason'],
+                status: data['status'],
+                createdAt: data['createdAt'].toDate(),
+              };
+            })
+          );
           this.pendingRequests.set(requests);
         });
       } else {
@@ -325,28 +341,38 @@ export class App {
     try {
       const db = getFirestore();
       const recordsRef = collection(db, 'users', request.userId, 'attendanceRecords');
+      
+      // ① まずは「出勤」「退勤」などのタイプだけで対象の履歴を取得する
       const recordQuery = query(
         recordsRef,
-        where('type', '==', request.type),
-        where('timestamp', '==', request.originalAtTimestamp)
+        where('type', '==', request.type)
       );
       const recordSnapshot = await getDocs(recordQuery);
 
-      if (recordSnapshot.docs.length === 0) {
-        console.error('Original attendance record not found');
+      // ② 取得したデータの中から、年月日時分が「1分以内の誤差」のものを探す（秒・ミリ秒のズレを吸収）
+      const targetTimeMs = request.originalAt.getTime();
+      const originalRecord = recordSnapshot.docs.find(doc => {
+        const recordTimeMs = doc.data()['timestamp'].toDate().getTime();
+        // 誤差が60000ミリ秒（1分）以内なら同一の打刻とみなす
+        return Math.abs(recordTimeMs - targetTimeMs) <= 60000;
+      });
+
+      if (!originalRecord) {
+        console.error('Original attendance record not found. 探した時間:', request.originalAt);
+        alert('エラー: 修正対象の打刻データ（元の時間）が見つかりません。');
+        this.reviewingRequestId.set(null);
         return;
       }
 
-      const originalRecord = recordSnapshot.docs[0];
       const batch = writeBatch(db);
 
-      // Update attendance record
+      // ③ 打刻データを上書き（correctedFrom には実際の元の時間をセット）
       batch.update(originalRecord.ref, {
         timestamp: request.correctedAtTimestamp,
-        correctedFrom: request.originalAtTimestamp,
+        correctedFrom: originalRecord.data()['timestamp'], 
       });
 
-      // Update correction request
+      // ④ 修正申請自体のステータスを更新
       const requestRef = doc(db, 'users', request.userId, 'correctionRequests', request.id);
       batch.update(requestRef, {
         status: 'approved',
@@ -355,8 +381,10 @@ export class App {
       });
 
       await batch.commit();
+      
     } catch (err) {
       console.error('Failed to approve request:', err);
+      alert('承認処理中にエラーが発生しました。');
     } finally {
       this.reviewingRequestId.set(null);
     }

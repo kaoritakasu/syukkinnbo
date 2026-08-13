@@ -1,0 +1,82 @@
+<header class="topbar">
+  <a class="topbar-link" routerLink="/admin">← 戻る</a>
+  <span class="brand">打刻修正申請一覧（管理者用）</span>
+</header>
+
+<main class="content">
+  <section class="card">
+    <h2>未承認申請</h2>
+
+    @if (reviewMessage()) {
+      <div class="message" [attr.data-type]="reviewMessage()?.startsWith('エラー') ? 'error' : 'success'">
+        {{ reviewMessage() }}
+      </div>
+    }
+
+    @if (pendingRequests().length === 0) {
+      <p class="muted">未承認の申請はありません。</p>
+    } @else {
+      <ul class="request-list">
+        @for (req of pendingRequests(); track req.id) {
+          <li class="request-item">
+            <div class="request-header">
+              <span class="employee-name">{{ req.displayName }}</span>
+              <span class="request-type">{{ req.typeLabel }}</span>
+            </div>
+            <div class="request-content">
+              <div class="time-change">
+                <span class="time-label">修正前: {{ req.originalLabel }}</span>
+                <span class="arrow">→</span>
+                <span class="time-label">修正後: {{ req.correctedLabel }}</span>
+              </div>
+              <p class="reason">理由: {{ req.reason }}</p>
+            </div>
+            <div class="request-actions">
+              <button
+                type="button"
+                class="btn btn-approve"
+                (click)="approve(req.uid, req.id)"
+                [disabled]="isProcessing()"
+              >
+                承認
+              </button>
+              <button
+                type="button"
+                class="btn btn-reject"
+                (click)="reject(req.uid, req.id)"
+                [disabled]="isProcessing()"
+              >
+                却下
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (reviewedRequests().length > 0) {
+    <section class="card">
+      <h2>対応済み申請</h2>
+      <ul class="request-list reviewed">
+        @for (req of reviewedRequests(); track req.id) {
+          <li class="request-item">
+            <div class="request-header">
+              <span class="employee-name">{{ req.displayName }}</span>
+              <span class="request-type">{{ req.typeLabel }}</span>
+              <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
+            </div>
+            <div class="request-content">
+              <div class="time-change">
+                <span class="time-label">修正前: {{ req.originalLabel }}</span>
+                <span class="arrow">→</span>
+                <span class="time-label">修正後: {{ req.correctedLabel }}</span>
+              </div>
+              <p class="reason">理由: {{ req.reason }}</p>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+</main>
