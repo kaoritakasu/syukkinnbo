@@ -3,7 +3,7 @@ import { DatePipe } from '@angular/common';
 import { Router, RouterLink, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot } from 'firebase/firestore';
 
 import { AttendanceType } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
@@ -115,11 +115,11 @@ export class App {
           where('status', '==', 'pending')
         );
 
-        this.unsubscribePendingRequests = onSnapshot(pendingQuery, async (snapshot) => {
+        this.unsubscribePendingRequests = onSnapshot(pendingQuery, async (snapshot: QuerySnapshot) => {
           this.pendingCorrectionCount.set(snapshot.docs.length);
 
           const requests = await Promise.all(
-            snapshot.docs.map(async (docSnap) => {
+            snapshot.docs.map(async (docSnap: QueryDocumentSnapshot) => {
               const data = docSnap.data();
               const userId = docSnap.ref.parent?.parent?.id;
 
@@ -164,11 +164,11 @@ export class App {
           const requestsRef = collection(db, 'users', user.uid, 'correctionRequests');
           const q = query(requestsRef, where('status', 'in', ['approved', 'rejected']));
 
-          onSnapshot(q, (snapshot) => {
+          onSnapshot(q, (snapshot: QuerySnapshot) => {
             const seenIds = JSON.parse(localStorage.getItem('seenRequestIds') || '[]');
 
             const unnotified = snapshot.docs
-              .map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
+              .map((doc: QueryDocumentSnapshot) => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
               .filter((data: any) => !seenIds.includes(data.id));
 
             if (unnotified.length > 0) {
@@ -317,7 +317,7 @@ export class App {
 
         if (recordsSnapshot.docs.length > 0) {
           const lastRecord = recordsSnapshot.docs
-            .map(doc => doc.data())
+            .map((doc: any) => doc.data())
             .sort((a: any, b: any) => b.timestamp.toDate().getTime() - a.timestamp.toDate().getTime())[0];
 
           const status = this.getStatus(lastRecord['type'], recordsSnapshot.docs);

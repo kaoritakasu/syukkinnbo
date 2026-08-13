@@ -2,18 +2,19 @@ import { Routes } from '@angular/router';
 import { adminGuard } from './admin/admin.guard';
 
 export const routes: Routes = [
+  // もしここに path: '' （ホーム画面）などの他の設定があったら、それは残してくださいね！
   {
     path: 'admin',
-    canActivate: [adminGuard],
+    canActivate: [adminGuard], // 👈 警備員の設定を復活させました！
     children: [
       {
-        path: 'requests',
-        loadComponent: () => import('./admin-requests/admin-requests.component').then((m) => m.AdminRequestsComponent),
+        path: '', 
+        loadComponent: () => import('./admin/admin-user-list').then((m) => m.AdminUserList),
       },
       {
-        path: '',
+        path: ':userId', 
         loadComponent: () => import('./admin/admin-attendance').then((m) => m.AdminAttendance),
       },
     ],
-  },
+  }
 ];

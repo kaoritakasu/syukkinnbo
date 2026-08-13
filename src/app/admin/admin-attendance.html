@@ -1,61 +1,59 @@
 <header class="topbar">
-  <a class="topbar-link" routerLink="/">← 戻る</a>
-  <span class="brand">全員の勤怠一覧（管理者用）</span>
+  <a class="topbar-link" routerLink="/admin">← 一覧に戻る</a>
+  <span class="brand">{{ userHistory()?.displayName || 'ユーザー名' }} の打刻履歴</span>
 </header>
 
 <main class="content">
-  @if (adminAttendanceService.historyByUser().length === 0) {
+  @if (!userHistory()) {
     <section class="card">
-      <p class="muted">まだ打刻データがありません。</p>
+      <p class="muted">ユーザーが見つかりません</p>
     </section>
   } @else {
-    @for (userHistory of adminAttendanceService.historyByUser(); track userHistory.uid) {
+    @if (userHistory()!.months.length === 0) {
       <section class="card">
-        <h2>{{ userHistory.displayName }}</h2>
-        @for (month of userHistory.months; track month.monthKey) {
-          <div class="month-block">
-            <div class="month-heading">
-              <h3>{{ month.monthLabel }}</h3>
-              @if (month.actualWorkDurationLabel) {
-                <span class="duration-chip">月間実労働時間 {{ month.actualWorkDurationLabel }}</span>
-              }
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden;">
-              <thead>
-                <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
-                  <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 100px; font-weight: 600; font-size: 13px;">日付</th>
-                  <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; font-weight: 600; font-size: 13px;">打刻記録</th>
-                  <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 80px; font-weight: 600; font-size: 13px;">休憩</th>
-                  <th style="padding: 12px; text-align: left; width: 80px; font-weight: 600; font-size: 13px;">実働</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (day of month.days; track day.dateKey) {
-                  <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 12px; border-right: 1px solid #eee; font-size: 13px;">{{ day.dateLabel }}</td>
-                    <td style="padding: 12px; border-right: 1px solid #eee;">
-                      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                        @for (record of day.records; track record.timestamp.getTime()) {
-                          <span style="background: #e3f2fd; padding: 4px 10px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
-                            <span style="font-weight: 500;">{{ record.typeLabel }}</span>
-                            <span>{{ record.timeLabel }}</span>
-                            @if (record.latitude && record.longitude) {
-                              <a [href]="'https://maps.google.com/?q=' + record.latitude + ',' + record.longitude" target="_blank" style="text-decoration: none; color: #0066cc;">📍</a>
-                            }
-                          </span>
-                        }
-                      </div>
-                    </td>
-                    <td style="padding: 12px; border-right: 1px solid #eee; font-size: 13px; text-align: center;">{{ day.breakDurationLabel }}</td>
-                    <td style="padding: 12px; font-size: 13px; text-align: center; font-weight: 500;">{{ day.actualWorkDurationLabel }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
+        <p class="muted">まだ打刻履歴がありません。</p>
       </section>
+    } @else {
+      @for (month of userHistory()!.months; track month.monthKey) {
+        <div style="margin-bottom: 40px;">
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+            <h3 style="margin: 0;">{{ month.monthLabel }}</h3>
+            <span style="background: #e3f2fd; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
+              月間実労働時間 {{ month.actualWorkDurationLabel }}
+            </span>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden;">
+            <thead>
+              <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 100px; font-weight: 600; font-size: 13px;">日付</th>
+                <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; font-weight: 600; font-size: 13px;">打刻記録</th>
+                <th style="padding: 12px; text-align: left; border-right: 1px solid #ddd; width: 80px; font-weight: 600; font-size: 13px;">休憩</th>
+                <th style="padding: 12px; text-align: left; width: 80px; font-weight: 600; font-size: 13px;">実働</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (day of month.days; track day.dateKey) {
+                <tr style="border-bottom: 1px solid #eee;">
+                  <td style="padding: 12px; border-right: 1px solid #eee; font-size: 13px;">{{ day.dateLabel }}</td>
+                  <td style="padding: 12px; border-right: 1px solid #eee;">
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      @for (record of day.records; track record.timestamp.getTime()) {
+                        <span style="background: #e3f2fd; padding: 4px 10px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
+                          <span style="font-weight: 500;">{{ record.typeLabel }}</span>
+                          <span>{{ record.timeLabel }}</span>
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td style="padding: 12px; border-right: 1px solid #eee; font-size: 13px; text-align: center;">{{ day.breakDurationLabel }}</td>
+                  <td style="padding: 12px; font-size: 13px; text-align: center; font-weight: 500;">{{ day.actualWorkDurationLabel }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     }
   }
 </main>
