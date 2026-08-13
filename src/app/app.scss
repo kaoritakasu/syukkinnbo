@@ -182,6 +182,17 @@
   background: transparent;
 }
 
+.btn-outline-secondary {
+  background: transparent;
+  border-color: #d7dae0;
+  color: #6b7280;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  border-color: #9ca3af;
+  color: #4b5563;
+}
+
 .btn-ghost {
   border-color: transparent;
   background: transparent;
