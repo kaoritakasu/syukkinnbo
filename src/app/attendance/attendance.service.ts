@@ -42,7 +42,7 @@ export class AttendanceService {
   private readonly authService = inject(AuthService);
 
   // Newest first, sourced directly from the Firestore query order.
-  private readonly records = signal<AttendanceRecord[]>([]);
+  readonly records = signal<AttendanceRecord[]>([]);
 
   readonly todayStatus: Signal<AttendanceStatus> = computed(() => {
     const latest = this.records()[0];

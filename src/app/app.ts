@@ -5,7 +5,7 @@ import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot } from 'firebase/firestore';
 
-import { AttendanceType } from './attendance/attendance-format';
+import { AttendanceType, toDateKey } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
 import { CorrectionRequestService } from './attendance/correction-request.service';
 import { AuthService } from './auth/auth.service';
@@ -108,6 +108,15 @@ export class App {
       .subscribe((event: any) => {
         this.currentRoute.set(event.url);
       });
+
+    effect(() => {
+      const records = this.attendanceService.records();
+      const today = toDateKey(new Date());
+      const todayRecords = records.filter(record => toDateKey(record.timestamp) === today);
+
+      this.hasPunchedInToday.set(todayRecords.some(r => r.type === 'clockIn'));
+      this.hasPunchedOutToday.set(todayRecords.some(r => r.type === 'clockOut'));
+    });
 
     effect(() => {
       if (this.isAdmin()) {
