@@ -9,6 +9,8 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
+  doc,
 } from 'firebase/firestore';
 
 import { AuthService } from '../auth/auth.service';
@@ -94,6 +96,25 @@ export class AttendanceService {
 
   readonly historyByMonth: Signal<AttendanceMonthGroup[]> = computed(() => groupDaysByMonth(this.historyByDate()));
 
+  private readonly weeklyWorkHoursMs: Signal<number> = computed(() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - dayOfWeek);
+    weekStart.setHours(0, 0, 0, 0);
+
+    let totalMs = 0;
+    for (const group of this.historyByDate()) {
+      const dayDate = new Date(group.dateKey);
+      if (dayDate >= weekStart) {
+        totalMs += group.actualWorkDurationMs;
+      }
+    }
+    return totalMs;
+  });
+
+  readonly weeklyWorkHours: Signal<number> = computed(() => this.weeklyWorkHoursMs() / (1000 * 60 * 60));
+
   // Used to validate correction requests: the reported "original time" must
   // exactly match (to the minute) an actual punch of the same type.
   hasExactRecord(type: AttendanceType, at: Date): boolean {
@@ -101,6 +122,7 @@ export class AttendanceService {
   }
 
   private unsubscribeRecords: Unsubscribe | null = null;
+  private notifiedWeekStart: string | null = null;
 
   constructor() {
     effect(() => {
@@ -133,13 +155,45 @@ export class AttendanceService {
                 timestamp,
                 timeLabel: timeFormatter.format(timestamp),
                 typeLabel: getTypeLabel(type),
-                latitude: data['latitude'],   // ← ★この行があるか確認！（無ければ追加）
-                longitude: data['longitude'], // ← ★この行があるか確認！（無ければ追加）
+                latitude: data['latitude'],
+                longitude: data['longitude'],
               };
             }),
         );
       });
    });
+
+    effect(() => {
+      const user = this.authService.user();
+      if (!user) return;
+
+      const hours = this.weeklyWorkHours();
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - dayOfWeek);
+      const weekStartKey = toDateKey(weekStart);
+
+      if (hours >= 35 && this.notifiedWeekStart !== weekStartKey) {
+        this.notifiedWeekStart = weekStartKey;
+        this.createNotification(user.uid, user.email || '');
+      }
+    });
+  }
+
+  private async createNotification(userId: string, userEmail: string): Promise<void> {
+    try {
+      const notifRef = doc(collection(firestore, 'notifications'));
+      await setDoc(notifRef, {
+        userId,
+        userEmail,
+        type: 'weekly35hours',
+        timestamp: serverTimestamp(),
+        read: false,
+      });
+    } catch (error) {
+      console.error('Failed to create notification:', error);
+    }
   }  
   clockIn(): Promise<void> {
     return this.record('clockIn');

@@ -92,6 +92,12 @@ service cloud.firestore {
         allow update: if isAdmin() && isValidReview();
         allow delete: if false;
       }
+
+      // Notifications for each user
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
     }
 
     // ▼ 全ユーザーの出勤状況（attendanceRecords）を一括検索するための特別ルール
@@ -102,6 +108,11 @@ service cloud.firestore {
     // ▼ （管理者用）修正申請の一括検索用ルール
     match /{path=**}/correctionRequests/{requestId} {
       allow read: if isAdmin();
+    }
+
+    // 35時間到達通知（Cloud Functions が作成）
+    match /notifications/{notificationId} {
+      allow read, write: if false;
     }
 
     // Deny everything else by default, including any future collections.
