@@ -170,23 +170,32 @@ export class AdminCorrectionRequestService {
 
     if (request.requestType === 'modify') {
       const match = await this.findMatchingRecord(uid, request.type, request.originalAt);
-      if (match && request.correctedAt) {
-        batch.update(match.ref, {
-          type: request.type,
-          timestamp: Timestamp.fromDate(request.correctedAt),
-          correctedFrom: match.timestamp,
-        });
+      if (!match) {
+        throw new Error('修正対象の打刻記録が見つかりません');
       }
+      if (!request.correctedAt) {
+        throw new Error('修正申請に修正後の日時が設定されていません');
+      }
+      batch.update(match.ref, {
+        type: request.type,
+        timestamp: Timestamp.fromDate(request.correctedAt),
+        correctedFrom: match.timestamp,
+      });
     } else if (request.requestType === 'add') {
+      const timestamp = request.correctedAt || request.originalAt;
+      if (!timestamp) {
+        throw new Error('追加申請に日時が設定されていません');
+      }
       batch.set(doc(collection(firestore, 'users', uid, 'attendanceRecords')), {
         type: request.type,
-        timestamp: Timestamp.fromDate(request.correctedAt || request.originalAt),
+        timestamp: Timestamp.fromDate(timestamp),
       });
     } else if (request.requestType === 'delete') {
       const match = await this.findMatchingRecord(uid, request.type, request.originalAt);
-      if (match) {
-        batch.delete(match.ref);
+      if (!match) {
+        throw new Error('削除対象の打刻記録が見つかりません');
       }
+      batch.delete(match.ref);
     }
 
     await batch.commit();

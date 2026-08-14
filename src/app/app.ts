@@ -151,14 +151,15 @@ export class App {
                 id: docSnap.id,
                 userId,
                 userDisplayName,
+                requestType: data['requestType'] || 'modify',
                 type: data['type'],
-                originalAt: data['originalAt'].toDate(),
+                originalAt: data['originalAt']?.toDate(),
                 originalAtTimestamp: data['originalAt'],
-                correctedAt: data['correctedAt'].toDate(),
+                correctedAt: data['correctedAt']?.toDate(),
                 correctedAtTimestamp: data['correctedAt'],
                 reason: data['reason'],
                 status: data['status'],
-                createdAt: data['createdAt'].toDate(),
+                createdAt: data['createdAt']?.toDate(),
               };
             })
           );
@@ -180,7 +181,22 @@ export class App {
             const seenIds = JSON.parse(localStorage.getItem('seenRequestIds') || '[]');
 
             const unnotified = snapshot.docs
-              .map((doc: QueryDocumentSnapshot) => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
+              .map((doc: QueryDocumentSnapshot) => {
+                const data = doc.data();
+                return {
+                  id: doc.id,
+                  ref: doc.ref,
+                  requestType: data['requestType'] || 'modify',
+                  type: data['type'],
+                  originalAt: data['originalAt']?.toDate(),
+                  originalAtTimestamp: data['originalAt'],
+                  correctedAt: data['correctedAt']?.toDate(),
+                  correctedAtTimestamp: data['correctedAt'],
+                  reason: data['reason'],
+                  status: data['status'],
+                  createdAt: data['createdAt']?.toDate(),
+                };
+              })
               .filter((data: any) => !seenIds.includes(data.id));
 
             if (unnotified.length > 0) {
@@ -457,8 +473,8 @@ export class App {
       });
 
       if (requestType === 'modify') {
-        if (!originalRecord) {
-          alert('エラー: 修正対象の打刻データが見つかりません。');
+        if (!originalRecord || !request.correctedAtTimestamp) {
+          alert('エラー: 修正対象の打刻データまたは修正後の時刻が見つかりません。');
           this.reviewingRequestId.set(null);
           return;
         }
@@ -467,9 +483,15 @@ export class App {
           correctedFrom: originalRecord.data()['timestamp'],
         });
       } else if (requestType === 'add') {
+        const timestamp = request.correctedAtTimestamp || request.originalAtTimestamp;
+        if (!timestamp) {
+          alert('エラー: 追加する打刻の日時が見つかりません。');
+          this.reviewingRequestId.set(null);
+          return;
+        }
         batch.set(doc(collection(db, 'users', request.userId, 'attendanceRecords')), {
           type: request.type,
-          timestamp: request.correctedAtTimestamp || request.originalAtTimestamp,
+          timestamp,
         });
       } else if (requestType === 'delete') {
         if (!originalRecord) {

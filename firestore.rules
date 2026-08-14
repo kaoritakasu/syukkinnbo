@@ -47,10 +47,11 @@ service cloud.firestore {
 
     function isValidCorrectionRequest() {
       let data = request.resource.data;
-      return data.keys().hasOnly(['type', 'originalAt', 'correctedAt', 'reason', 'status', 'createdAt'])
+      return data.keys().hasOnly(['requestType', 'type', 'originalAt', 'correctedAt', 'reason', 'status', 'createdAt'])
+        && data.requestType in ['modify', 'add', 'delete']
         && data.type in ['clockIn', 'clockOut', 'breakStart', 'breakEnd']
         && data.originalAt is timestamp
-        && data.correctedAt is timestamp
+        && (!('correctedAt' in data) || data.correctedAt is timestamp)
         && data.reason is string
         && data.reason.size() <= 200
         && data.status == 'pending'
@@ -62,12 +63,13 @@ service cloud.firestore {
       let after = request.resource.data;
       return before.status == 'pending'
         && after.status in ['approved', 'rejected']
+        && after.requestType == before.requestType
         && after.type == before.type
         && after.originalAt == before.originalAt
         && after.correctedAt == before.correctedAt
         && after.reason == before.reason
         && after.createdAt == before.createdAt
-        && after.keys().hasOnly(['type', 'originalAt', 'correctedAt', 'reason', 'status', 'createdAt', 'reviewedAt', 'reviewedBy'])
+        && after.keys().hasOnly(['requestType', 'type', 'originalAt', 'correctedAt', 'reason', 'status', 'createdAt', 'reviewedAt', 'reviewedBy'])
         && after.reviewedAt == request.time
         && after.reviewedBy is string;
     }
