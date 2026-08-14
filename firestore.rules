@@ -37,7 +37,7 @@ service cloud.firestore {
     function isValidRecordCorrection() {
       let before = resource.data;
       let after = request.resource.data;
-      return after.type == before.type
+      return after.type in ['clockIn', 'clockOut', 'breakStart', 'breakEnd']
         && after.timestamp is timestamp
         && after.correctedFrom == before.timestamp
         && after.keys().hasOnly(['type', 'timestamp', 'correctedFrom', 'latitude', 'longitude'])

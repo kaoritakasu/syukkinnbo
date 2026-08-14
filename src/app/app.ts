@@ -395,8 +395,9 @@ export class App {
 
   protected async approveRequest(request: any): Promise<void> {
     this.reviewingRequestId.set(request.id);
+    const db = getFirestore();
+    let originalRecord: any = null;
     try {
-      const db = getFirestore();
       const recordsRef = collection(db, 'users', request.userId, 'attendanceRecords');
 
       const recordQuery = query(
@@ -421,7 +422,7 @@ export class App {
         }
       }
 
-      const originalRecord = bestMatch;
+      originalRecord = bestMatch;
 
       if (!originalRecord) {
         console.error('Original attendance record not found. 探した時間:', request.originalAt);
@@ -432,13 +433,31 @@ export class App {
 
       const batch = writeBatch(db);
 
+      console.log('[DEBUG] Before batch.update - attendanceRecord:', {
+        recordPath: originalRecord.ref.path,
+        updateData: {
+          type: request.type,
+          timestamp: request.correctedAtTimestamp,
+          correctedFrom: originalRecord.data()['timestamp'],
+        }
+      });
+
       batch.update(originalRecord.ref, {
-        type: request.type,
         timestamp: request.correctedAtTimestamp,
         correctedFrom: originalRecord.data()['timestamp'],
       });
 
       const requestRef = doc(db, 'users', request.userId, 'correctionRequests', request.id);
+
+      console.log('[DEBUG] Before batch.update - correctionRequest:', {
+        requestPath: requestRef.path,
+        updateData: {
+          status: 'approved',
+          reviewedAt: serverTimestamp(),
+          reviewedBy: this.authService.user()?.email || '',
+        }
+      });
+
       batch.update(requestRef, {
         status: 'approved',
         reviewedAt: serverTimestamp(),
@@ -446,10 +465,24 @@ export class App {
       });
 
       await batch.commit();
+      console.log('[DEBUG] Batch committed successfully');
 
-    } catch (err) {
-      console.error('Failed to approve request:', err);
-      alert('承認処理中にエラーが発生しました。');
+    } catch (err: any) {
+      const errorCode = err?.code || 'UNKNOWN';
+      const errorMessage = err?.message || String(err);
+      console.error('[ERROR] Failed to approve request:', {
+        code: errorCode,
+        message: errorMessage,
+        fullError: err,
+        debugInfo: {
+          recordPath: originalRecord?.ref?.path,
+          requestPath: doc(db, 'users', request.userId, 'correctionRequests', request.id).path,
+          userId: request.userId,
+          requestId: request.id,
+          userEmail: this.authService.user()?.email,
+        }
+      });
+      alert(`承認処理中にエラーが発生しました。\n[${errorCode}] ${errorMessage}`);
     } finally {
       this.reviewingRequestId.set(null);
     }
