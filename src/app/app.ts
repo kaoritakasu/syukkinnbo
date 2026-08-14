@@ -3,7 +3,7 @@ import { DatePipe } from '@angular/common';
 import { Router, RouterLink, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot } from 'firebase/firestore';
+import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot, orderBy } from 'firebase/firestore';
 
 import { AttendanceType, toDateKey, isSameMinute } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
@@ -399,24 +399,29 @@ export class App {
       const db = getFirestore();
       const recordsRef = collection(db, 'users', request.userId, 'attendanceRecords');
 
-      const startOfDay = new Date(request.originalAt);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(startOfDay);
-      endOfDay.setDate(endOfDay.getDate() + 1);
-
       const recordQuery = query(
         recordsRef,
         where('type', '==', request.type),
-        where('timestamp', '>=', Timestamp.fromDate(startOfDay)),
-        where('timestamp', '<', Timestamp.fromDate(endOfDay))
+        orderBy('timestamp', 'desc')
       );
       const recordSnapshot = await getDocs(recordQuery);
 
-      const originalRecord = recordSnapshot.docs.find(doc => {
+      let bestMatch: any = null;
+      let bestDiffMs = Infinity;
+
+      for (const doc of recordSnapshot.docs) {
         const data = doc.data();
         const timestamp = (data['timestamp'] as Timestamp).toDate();
-        return isSameMinute(timestamp, request.originalAt);
-      });
+        if (isSameMinute(timestamp, request.originalAt)) {
+          const diffMs = Math.abs(timestamp.getTime() - request.originalAt.getTime());
+          if (diffMs < bestDiffMs) {
+            bestDiffMs = diffMs;
+            bestMatch = doc;
+          }
+        }
+      }
+
+      const originalRecord = bestMatch;
 
       if (!originalRecord) {
         console.error('Original attendance record not found. 探した時間:', request.originalAt);
