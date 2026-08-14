@@ -421,6 +421,7 @@ export class App {
       const batch = writeBatch(db);
 
       batch.update(originalRecord.ref, {
+        type: request.type,
         timestamp: request.correctedAtTimestamp,
         correctedFrom: originalRecord.data()['timestamp'],
       });
