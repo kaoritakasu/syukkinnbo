@@ -3,7 +3,7 @@ import { DatePipe } from '@angular/common';
 import { Router, RouterLink, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot, orderBy } from 'firebase/firestore';
+import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot } from 'firebase/firestore';
 
 import { AttendanceType, toDateKey, isSameMinute } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
@@ -402,25 +402,30 @@ export class App {
 
       const recordQuery = query(
         recordsRef,
-        where('type', '==', request.type),
-        orderBy('timestamp', 'desc')
+        where('type', '==', request.type)
       );
       const recordSnapshot = await getDocs(recordQuery);
 
       let bestMatch: any = null;
       let bestDiffMs = Infinity;
 
-      for (const doc of recordSnapshot.docs) {
-        const data = doc.data();
-        const timestamp = (data['timestamp'] as Timestamp).toDate();
-        if (isSameMinute(timestamp, request.originalAt)) {
-          const diffMs = Math.abs(timestamp.getTime() - request.originalAt.getTime());
-          if (diffMs < bestDiffMs) {
-            bestDiffMs = diffMs;
-            bestMatch = doc;
+      recordSnapshot.docs
+        .sort((a, b) => {
+          const aTime = (a.data()['timestamp'] as Timestamp).toMillis();
+          const bTime = (b.data()['timestamp'] as Timestamp).toMillis();
+          return bTime - aTime;
+        })
+        .forEach(doc => {
+          const data = doc.data();
+          const timestamp = (data['timestamp'] as Timestamp).toDate();
+          if (isSameMinute(timestamp, request.originalAt)) {
+            const diffMs = Math.abs(timestamp.getTime() - request.originalAt.getTime());
+            if (diffMs < bestDiffMs) {
+              bestDiffMs = diffMs;
+              bestMatch = doc;
+            }
           }
-        }
-      }
+        });
 
       originalRecord = bestMatch;
 
