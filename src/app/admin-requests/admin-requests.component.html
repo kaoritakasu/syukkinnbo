@@ -21,13 +21,16 @@
           <li class="request-item">
             <div class="request-header">
               <span class="employee-name">{{ req.displayName }}</span>
+              <span class="request-type">{{ req.requestTypeLabel }}</span>
               <span class="request-type">{{ req.typeLabel }}</span>
             </div>
             <div class="request-content">
               <div class="time-change">
-                <span class="time-label">修正前: {{ req.originalLabel }}</span>
-                <span class="arrow">→</span>
-                <span class="time-label">修正後: {{ req.correctedLabel }}</span>
+                <span class="time-label">{{ req.originalLabel }}</span>
+                @if (req.correctedLabel) {
+                  <span class="arrow">→</span>
+                  <span class="time-label">{{ req.correctedLabel }}</span>
+                }
               </div>
               <p class="reason">理由: {{ req.reason }}</p>
             </div>
@@ -63,14 +66,17 @@
           <li class="request-item">
             <div class="request-header">
               <span class="employee-name">{{ req.displayName }}</span>
+              <span class="request-type">{{ req.requestTypeLabel }}</span>
               <span class="request-type">{{ req.typeLabel }}</span>
               <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
             </div>
             <div class="request-content">
               <div class="time-change">
-                <span class="time-label">修正前: {{ req.originalLabel }}</span>
-                <span class="arrow">→</span>
-                <span class="time-label">修正後: {{ req.correctedLabel }}</span>
+                <span class="time-label">{{ req.originalLabel }}</span>
+                @if (req.correctedLabel) {
+                  <span class="arrow">→</span>
+                  <span class="time-label">{{ req.correctedLabel }}</span>
+                }
               </div>
               <p class="reason">理由: {{ req.reason }}</p>
             </div>
