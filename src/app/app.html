@@ -7,29 +7,7 @@
     <span>{{ title() }}</span>
   </div>
   <span class="clock-date">{{ nowDateLabel() }}</span>
-  <div class="topbar-notifications">
-    @if ((notificationService.notifications() | slice:0:3).length > 0; as notifications) {
-      <button type="button" class="btn btn-ghost notification-bell" (click)="showNotifications.set(!showNotifications())">
-        🔔 {{ notificationService.notifications().length }}
-      </button>
-      @if (showNotifications()) {
-        <div class="notification-dropdown">
-        @for (notif of notifications(); track notif?.id || $index) {
-          <div class="notification-item" [class.unread]="!notif.read">
-              <strong>{{ notif.title }}</strong>
-              <p>{{ notif.body }}</p>
-              <small>{{ notif.timestamp | date:'short' }}</small>
-            </div>
-          }
-          @if (notificationService.notifications().length > 3) {
-            <div class="notification-item-more">
-              他 {{ notificationService.notifications().length - 3 }} 件
-            </div>
-          }
-        </div>
-      }
-    }
-  </div>
+
   <div class="topbar-auth">
     @if (authService.loading()) {
       <span class="muted">読み込み中...</span>
@@ -57,7 +35,18 @@
               🔔 未承認の打刻修正申請が {{ pendingCorrectionCount() }} 件あります！
             </a>
           }
-          
+
+          <!-- 35時間超過通知 -->
+          @if (notificationService.notifications(); as notifs) {
+            @if (notifs.length > 0) {
+              <div style="color: #d32f2f; font-weight: bold; margin: 15px 0; padding: 10px; background: white; border-radius: 4px; border-left: 4px solid #d32f2f;">
+               @if (notificationService.notifications().length > 0) {
+    <div>⚠️労働時間が35時間を超えているメンバーがいます {{ notificationService.notifications()[0].title }}</div>
+  }
+              </div>
+            }
+          }
+
           <!-- ▼ 全員の履歴を見るボタン ▼ -->
           <a routerLink="/admin" class="btn btn-outline-secondary">👥 全員の履歴を見る</a>
           
@@ -108,6 +97,17 @@
           <p class="feedback">{{ statusMessage() }}</p>
         }
       </section>
+
+      <!-- 35時間超過通知 -->
+      @if (notificationService.notifications(); as notifs) {
+        @if (notifs.length > 0) {
+          <div style="color: red; font-weight: bold; margin: 15px 0; padding: 15px; background: #ffebee; border-radius: 8px; border-left: 4px solid #d32f2f;">
+           @if (notificationService.notifications().length > 0) {
+    <div>⚠️労働時間が35時間を超えています {{ notificationService.notifications()[0].title }}</div>
+  }
+          </div>
+        }
+      }
 
       <div class="card-columns">
         <section class="card">

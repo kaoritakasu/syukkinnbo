@@ -186,7 +186,7 @@ export class AttendanceService {
 
   private async createNotification(userId: string, userEmail: string): Promise<void> {
     try {
-      const notifRef = doc(collection(firestore, 'notifications'));
+     const notifRef = doc(collection(firestore, 'users', userId, 'notifications'));
       console.log('[35h] Writing notification to Firestore:', { notifRefId: notifRef.id, userId, userEmail });
       await setDoc(notifRef, {
         userId,

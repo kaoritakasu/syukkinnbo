@@ -1,6 +1,5 @@
 import { Component, DestroyRef, computed, inject, signal, effect } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { SlicePipe } from '@angular/common';
 import { Router, RouterLink, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -48,7 +47,7 @@ const STATUS_LABELS: any = {
 
 @Component({
   selector: 'app-root',
-  imports: [DatePipe, RouterLink, RouterOutlet, SlicePipe],
+  imports: [DatePipe, RouterLink, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -122,6 +121,10 @@ export class App {
 
       this.hasPunchedInToday.set(todayRecords.some(r => r.type === 'clockIn'));
       this.hasPunchedOutToday.set(todayRecords.some(r => r.type === 'clockOut'));
+    });
+
+    effect(() => {
+      this.notifications.set(this.notificationService.notifications());
     });
 
     effect(() => {
