@@ -82,8 +82,10 @@ export class App {
   protected readonly showHistory = signal(false);
   protected readonly correctionRequestType = signal<CorrectionRequestType>('modify');
   protected readonly correctionType = signal<AttendanceType>('clockIn');
-  protected readonly correctionOriginalAt = signal('');
-  protected readonly correctionCorrectedAt = signal('');
+  protected readonly originalDate = signal('');
+  protected readonly originalTime = signal('');
+  protected readonly correctedDate = signal('');
+  protected readonly correctedTime = signal('');
   protected readonly correctionReason = signal('');
   protected readonly correctionSaving = signal(false);
   protected readonly correctionMessage = signal<string | null>(null);
@@ -292,12 +294,20 @@ export class App {
     this.correctionType.set(value as AttendanceType);
   }
 
-  protected setCorrectionOriginalAt(value: string): void {
-    this.correctionOriginalAt.set(value);
+  protected setOriginalDate(value: string): void {
+    this.originalDate.set(value);
   }
 
-  protected setCorrectionCorrectedAt(value: string): void {
-    this.correctionCorrectedAt.set(value);
+  protected setOriginalTime(value: string): void {
+    this.originalTime.set(value);
+  }
+
+  protected setCorrectedDate(value: string): void {
+    this.correctedDate.set(value);
+  }
+
+  protected setCorrectedTime(value: string): void {
+    this.correctedTime.set(value);
   }
 
   protected setCorrectionReason(value: string): void {
@@ -310,9 +320,9 @@ export class App {
 
   protected async submitCorrectionRequest(): Promise<void> {
     const requestType = this.correctionRequestType();
-    const originalAt = new Date(this.correctionOriginalAt());
+    const originalAt = new Date(this.originalDate() + 'T' + this.originalTime());
 
-    if (Number.isNaN(originalAt.getTime())) {
+    if (!this.originalDate() || !this.originalTime() || Number.isNaN(originalAt.getTime())) {
       this.correctionMessage.set('打刻日時を入力してください');
       return;
     }
@@ -329,8 +339,8 @@ export class App {
     }
 
     if (requestType === 'modify') {
-      const correctedAt = new Date(this.correctionCorrectedAt());
-      if (Number.isNaN(correctedAt.getTime())) {
+      const correctedAt = new Date(this.correctedDate() + 'T' + this.correctedTime());
+      if (!this.correctedDate() || !this.correctedTime() || Number.isNaN(correctedAt.getTime())) {
         this.correctionMessage.set('変更後の日時を入力してください');
         return;
       }
@@ -346,12 +356,14 @@ export class App {
         reason: this.correctionReason().trim(),
       };
       if (requestType === 'modify' || requestType === 'add') {
-        input.correctedAt = new Date(this.correctionCorrectedAt());
+        input.correctedAt = new Date(this.correctedDate() + 'T' + this.correctedTime());
       }
       await this.correctionRequestService.submit(input);
       this.correctionMessage.set('管理者に申請しました');
-      this.correctionOriginalAt.set('');
-      this.correctionCorrectedAt.set('');
+      this.originalDate.set('');
+      this.originalTime.set('');
+      this.correctedDate.set('');
+      this.correctedTime.set('');
       this.correctionReason.set('');
       this.correctionRequestType.set('modify');
       this.showCorrectionForm.set(false);

@@ -137,23 +137,43 @@
                   }
                 </select>
               </label>
-              <label>
-                {{ correctionRequestType() === 'delete' ? '削除対象の日時' : '打刻日時' }}
-                <input
-                  type="datetime-local"
-                  [value]="correctionOriginalAt()"
-                  (change)="setCorrectionOriginalAt($any($event.target).value)"
-                />
-              </label>
-              @if (correctionRequestType() !== 'delete') {
-                <label>
-                  {{ correctionRequestType() === 'add' ? '追加する日時' : '変更後の日時' }}
+              <div style="display: flex; gap: 10px; align-items: flex-end;">
+                <label style="flex: 1;">
+                  {{ correctionRequestType() === 'delete' ? '削除対象の日付' : '打刻日付' }}
                   <input
-                    type="datetime-local"
-                    [value]="correctionCorrectedAt()"
-                    (change)="setCorrectionCorrectedAt($any($event.target).value)"
+                    type="date"
+                    [value]="originalDate()"
+                    (change)="setOriginalDate($any($event.target).value)"
                   />
                 </label>
+                <label style="flex: 0 0 auto;">
+                  時刻
+                  <input
+                    type="time"
+                    [value]="originalTime()"
+                    (change)="setOriginalTime($any($event.target).value)"
+                  />
+                </label>
+              </div>
+              @if (correctionRequestType() !== 'delete') {
+                <div style="display: flex; gap: 10px; align-items: flex-end;">
+                  <label style="flex: 1;">
+                    {{ correctionRequestType() === 'add' ? '追加する日付' : '変更後の日付' }}
+                    <input
+                      type="date"
+                      [value]="correctedDate()"
+                      (change)="setCorrectedDate($any($event.target).value)"
+                    />
+                  </label>
+                  <label style="flex: 0 0 auto;">
+                    時刻
+                    <input
+                      type="time"
+                      [value]="correctedTime()"
+                      (change)="setCorrectedTime($any($event.target).value)"
+                    />
+                  </label>
+                </div>
               }
               <label>
                 理由
