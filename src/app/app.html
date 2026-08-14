@@ -99,7 +99,15 @@
           @if (showCorrectionForm()) {
             <div class="correction-form">
               <label>
-                間違えたボタン
+                申請タイプ
+                <select [value]="correctionRequestType()" (change)="setCorrectionRequestType($any($event.target).value)">
+                  <option value="modify">修正</option>
+                  <option value="add">追加（押し忘れ）</option>
+                  <option value="delete">削除（誤打刻）</option>
+                </select>
+              </label>
+              <label>
+                打刻の種類
                 <select [value]="correctionType()" (change)="setCorrectionType($any($event.target).value)">
                   @for (option of correctionTypeOptions; track option.value) {
                     <option [value]="option.value">{{ option.label }}</option>
@@ -107,27 +115,30 @@
                 </select>
               </label>
               <label>
-                打刻ミスをした日時
+                {{ correctionRequestType() === 'delete' ? '削除対象の日時' : '打刻日時' }}
                 <input
                   type="datetime-local"
                   [value]="correctionOriginalAt()"
                   (change)="setCorrectionOriginalAt($any($event.target).value)"
                 />
               </label>
+              @if (correctionRequestType() !== 'delete') {
+                <label>
+                  {{ correctionRequestType() === 'add' ? '追加する日時' : '変更後の日時' }}
+                  <input
+                    type="datetime-local"
+                    [value]="correctionCorrectedAt()"
+                    (change)="setCorrectionCorrectedAt($any($event.target).value)"
+                  />
+                </label>
+              }
               <label>
-                変更後の日時
-                <input
-                  type="datetime-local"
-                  [value]="correctionCorrectedAt()"
-                  (change)="setCorrectionCorrectedAt($any($event.target).value)"
-                />
-              </label>
-              <label>
-                理由（打刻漏れなど）
+                理由
                 <input
                   type="text"
                   [value]="correctionReason()"
                   (change)="setCorrectionReason($any($event.target).value)"
+                  [placeholder]="correctionRequestType() === 'add' ? '例：朝、打刻忘れ' : (correctionRequestType() === 'delete' ? '例：誤操作' : '例：時刻の誤入力')"
                 />
               </label>
               <div class="form-actions">
@@ -291,12 +302,16 @@
                       <span>{{ request.userDisplayName }}</span>
                     </div>
                     <div style="margin-bottom: 5px;">
+                      <span style="color: #666;">申請タイプ: </span>
+                      <span style="background: #fff3e0; padding: 2px 8px; border-radius: 4px;">{{ request.requestType === 'modify' ? '修正' : (request.requestType === 'add' ? '追加' : '削除') }}</span>
+                    </div>
+                    <div style="margin-bottom: 5px;">
                       <span style="color: #666;">対象: </span>
                       <span style="background: #e3f2fd; padding: 2px 8px; border-radius: 4px;">{{ typeLabels[request.type] }}</span>
                     </div>
                     <div style="margin-bottom: 5px;">
-                      <span style="color: #666;">修正内容: </span>
-                      <span>{{ request.originalAt | date: 'M/d HH:mm:ss' }} → {{ request.correctedAt | date: 'M/d HH:mm:ss' }}</span>
+                      <span style="color: #666;">内容: </span>
+                      <span>{{ request.originalAt | date: 'M/d HH:mm:ss' }} @if (request.requestType !== 'delete') { → {{ request.correctedAt | date: 'M/d HH:mm:ss' }} }</span>
                     </div>
                     <div style="margin-bottom: 10px;">
                       <span style="color: #666;">理由: </span>
@@ -339,12 +354,13 @@
         @for (req of reviewedRequests(); track req.id) {
           <div style="margin-bottom: 15px; padding: 15px; border-radius: 8px; border: 1px solid #ddd;"
                [style.background]="req.status === 'approved' ? '#e8f5e9' : '#ffebee'">
-               
+
             <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 10px;"
                  [style.color]="req.status === 'approved' ? '#2e7d32' : '#c62828'">
               {{ req.status === 'approved' ? '✅ 承認されました' : '❌ 却下されました' }}
             </div>
-            
+
+            <div><span style="color: #666;">申請タイプ: </span>{{ req.requestType === 'modify' ? '修正' : (req.requestType === 'add' ? '追加' : '削除') }}</div>
             <div><span style="color: #666;">対象: </span>{{ typeLabels[req.type] }}</div>
             <div><span style="color: #666;">理由: </span>{{ req.reason }}</div>
           </div>
@@ -375,8 +391,9 @@
           <ul class="request-list">
             @for (req of correctionRequestService.requests(); track req.id) {
               <li>
+                <span class="request-type">{{ req.requestTypeLabel }}</span>
                 <span class="request-type">{{ req.typeLabel }}</span>
-                <span>{{ req.originalLabel }} → {{ req.correctedLabel }}</span>
+                <span>{{ req.originalLabel }} @if (req.correctedLabel) { → {{ req.correctedLabel }} }</span>
                 <span class="request-reason">{{ req.reason }}</span>
                 <span class="status-chip" [attr.data-status]="req.status">{{ req.statusLabel }}</span>
               </li>

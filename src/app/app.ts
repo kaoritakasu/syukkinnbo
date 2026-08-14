@@ -3,11 +3,11 @@ import { DatePipe } from '@angular/common';
 import { Router, RouterLink, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot } from 'firebase/firestore';
+import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot, deleteDoc } from 'firebase/firestore';
 
 import { AttendanceType, toDateKey, isSameMinute } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
-import { CorrectionRequestService } from './attendance/correction-request.service';
+import { CorrectionRequestService, CorrectionRequestType } from './attendance/correction-request.service';
 import { AuthService } from './auth/auth.service';
 
 const CORRECTION_TYPE_OPTIONS: { value: AttendanceType; label: string }[] = [
@@ -76,6 +76,7 @@ export class App {
   protected readonly typeLabels = TYPE_LABELS;
   protected readonly showCorrectionForm = signal(false);
   protected readonly showHistory = signal(false);
+  protected readonly correctionRequestType = signal<CorrectionRequestType>('modify');
   protected readonly correctionType = signal<AttendanceType>('clockIn');
   protected readonly correctionOriginalAt = signal('');
   protected readonly correctionCorrectedAt = signal('');
@@ -279,36 +280,56 @@ export class App {
     this.correctionReason.set(value);
   }
 
-  protected async submitCorrectionRequest(): Promise<void> {
-    const originalAt = new Date(this.correctionOriginalAt());
-    const correctedAt = new Date(this.correctionCorrectedAt());
+  protected setCorrectionRequestType(value: string): void {
+    this.correctionRequestType.set(value as CorrectionRequestType);
+  }
 
-    if (Number.isNaN(originalAt.getTime()) || Number.isNaN(correctedAt.getTime())) {
-      this.correctionMessage.set('打刻ミスをした日時と変更後の日時を入力してください');
+  protected async submitCorrectionRequest(): Promise<void> {
+    const requestType = this.correctionRequestType();
+    const originalAt = new Date(this.correctionOriginalAt());
+
+    if (Number.isNaN(originalAt.getTime())) {
+      this.correctionMessage.set('打刻日時を入力してください');
       return;
     }
     if (!this.correctionReason().trim()) {
       this.correctionMessage.set('理由を入力してください');
       return;
     }
-    if (!this.attendanceService.hasExactRecord(this.correctionType(), originalAt)) {
-      this.correctionMessage.set('入力した「打刻ミスをした日時」と一致する打刻記録が見つかりません。時刻を確認してください。');
-      return;
+
+    if (requestType === 'modify' || requestType === 'delete') {
+      if (!this.attendanceService.hasExactRecord(this.correctionType(), originalAt)) {
+        this.correctionMessage.set('入力した日時と一致する打刻記録が見つかりません。時刻を確認してください。');
+        return;
+      }
+    }
+
+    if (requestType === 'modify') {
+      const correctedAt = new Date(this.correctionCorrectedAt());
+      if (Number.isNaN(correctedAt.getTime())) {
+        this.correctionMessage.set('変更後の日時を入力してください');
+        return;
+      }
     }
 
     this.correctionSaving.set(true);
     this.correctionMessage.set(null);
     try {
-      await this.correctionRequestService.submit({
+      const input: any = {
+        requestType,
         type: this.correctionType(),
         originalAt,
-        correctedAt,
         reason: this.correctionReason().trim(),
-      });
-      this.correctionMessage.set('管理者に打刻修正を申請しました');
+      };
+      if (requestType === 'modify' || requestType === 'add') {
+        input.correctedAt = new Date(this.correctionCorrectedAt());
+      }
+      await this.correctionRequestService.submit(input);
+      this.correctionMessage.set('管理者に申請しました');
       this.correctionOriginalAt.set('');
       this.correctionCorrectedAt.set('');
       this.correctionReason.set('');
+      this.correctionRequestType.set('modify');
       this.showCorrectionForm.set(false);
     } catch (err) {
       console.error(err);
@@ -399,11 +420,7 @@ export class App {
     let originalRecord: any = null;
     try {
       const recordsRef = collection(db, 'users', request.userId, 'attendanceRecords');
-
-      const recordQuery = query(
-        recordsRef,
-        where('type', '==', request.type)
-      );
+      const recordQuery = query(recordsRef, where('type', '==', request.type));
       const recordSnapshot = await getDocs(recordQuery);
 
       let bestMatch: any = null;
@@ -429,39 +446,9 @@ export class App {
 
       originalRecord = bestMatch;
 
-      if (!originalRecord) {
-        console.error('Original attendance record not found. 探した時間:', request.originalAt);
-        alert('エラー: 修正対象の打刻データ（元の時間）が見つかりません。');
-        this.reviewingRequestId.set(null);
-        return;
-      }
-
       const batch = writeBatch(db);
-
-      console.log('[DEBUG] Before batch.update - attendanceRecord:', {
-        recordPath: originalRecord.ref.path,
-        updateData: {
-          type: request.type,
-          timestamp: request.correctedAtTimestamp,
-          correctedFrom: originalRecord.data()['timestamp'],
-        }
-      });
-
-      batch.update(originalRecord.ref, {
-        timestamp: request.correctedAtTimestamp,
-        correctedFrom: originalRecord.data()['timestamp'],
-      });
-
       const requestRef = doc(db, 'users', request.userId, 'correctionRequests', request.id);
-
-      console.log('[DEBUG] Before batch.update - correctionRequest:', {
-        requestPath: requestRef.path,
-        updateData: {
-          status: 'approved',
-          reviewedAt: serverTimestamp(),
-          reviewedBy: this.authService.user()?.email || '',
-        }
-      });
+      const requestType = request.requestType || 'modify';
 
       batch.update(requestRef, {
         status: 'approved',
@@ -469,8 +456,31 @@ export class App {
         reviewedBy: this.authService.user()?.email || '',
       });
 
+      if (requestType === 'modify') {
+        if (!originalRecord) {
+          alert('エラー: 修正対象の打刻データが見つかりません。');
+          this.reviewingRequestId.set(null);
+          return;
+        }
+        batch.update(originalRecord.ref, {
+          timestamp: request.correctedAtTimestamp,
+          correctedFrom: originalRecord.data()['timestamp'],
+        });
+      } else if (requestType === 'add') {
+        batch.set(doc(collection(db, 'users', request.userId, 'attendanceRecords')), {
+          type: request.type,
+          timestamp: request.correctedAtTimestamp || request.originalAtTimestamp,
+        });
+      } else if (requestType === 'delete') {
+        if (!originalRecord) {
+          alert('エラー: 削除対象の打刻データが見つかりません。');
+          this.reviewingRequestId.set(null);
+          return;
+        }
+        batch.delete(originalRecord.ref);
+      }
+
       await batch.commit();
-      console.log('[DEBUG] Batch committed successfully');
 
     } catch (err: any) {
       const errorCode = err?.code || 'UNKNOWN';
@@ -479,13 +489,6 @@ export class App {
         code: errorCode,
         message: errorMessage,
         fullError: err,
-        debugInfo: {
-          recordPath: originalRecord?.ref?.path,
-          requestPath: doc(db, 'users', request.userId, 'correctionRequests', request.id).path,
-          userId: request.userId,
-          requestId: request.id,
-          userEmail: this.authService.user()?.email,
-        }
       });
       alert(`承認処理中にエラーが発生しました。\n[${errorCode}] ${errorMessage}`);
     } finally {

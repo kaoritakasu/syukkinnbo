@@ -21,14 +21,14 @@ export class AdminRequestsComponent implements OnInit, OnDestroy {
     this.adminCorrectionRequestService
       .requests()
       .filter((r) => r.status === 'pending')
-      .sort((a, b) => b.correctedAt.getTime() - a.correctedAt.getTime())
+      .sort((a, b) => b.originalAt.getTime() - a.originalAt.getTime())
   );
 
   protected readonly reviewedRequests = computed(() =>
     this.adminCorrectionRequestService
       .requests()
       .filter((r) => r.status !== 'pending')
-      .sort((a, b) => b.correctedAt.getTime() - a.correctedAt.getTime())
+      .sort((a, b) => b.originalAt.getTime() - a.originalAt.getTime())
   );
 
   ngOnInit(): void {

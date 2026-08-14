@@ -5,6 +5,7 @@ import {
   Unsubscribe,
   collection,
   collectionGroup,
+  deleteDoc,
   doc,
   getDocs,
   getFirestore,
@@ -21,8 +22,10 @@ import {
 import { AttendanceType, getTypeLabel, isSameMinute } from '../attendance/attendance-format';
 import {
   CorrectionRequestStatus,
+  CorrectionRequestType,
   dateTimeFormatter,
   getCorrectionStatusLabel,
+  getCorrectionRequestTypeLabel,
 } from '../attendance/correction-request.service';
 import { AuthService } from '../auth/auth.service';
 import { firebaseApp } from '../core/firebase-app';
@@ -33,9 +36,10 @@ const REQUESTS_LIMIT = 500;
 interface RawRequest {
   id: string;
   uid: string;
+  requestType: CorrectionRequestType;
   type: AttendanceType;
   originalAt: Date;
-  correctedAt: Date;
+  correctedAt?: Date;
   reason: string;
   status: CorrectionRequestStatus;
 }
@@ -44,12 +48,14 @@ export interface AdminCorrectionRequest {
   id: string;
   uid: string;
   displayName: string;
+  requestType: CorrectionRequestType;
+  requestTypeLabel: string;
   type: AttendanceType;
   typeLabel: string;
   originalAt: Date;
   originalLabel: string;
-  correctedAt: Date;
-  correctedLabel: string;
+  correctedAt?: Date;
+  correctedLabel?: string;
   reason: string;
   status: CorrectionRequestStatus;
   statusLabel: string;
@@ -71,12 +77,14 @@ export class AdminCorrectionRequestService {
       id: request.id,
       uid: request.uid,
       displayName: names.get(request.uid) ?? request.uid,
+      requestType: request.requestType,
+      requestTypeLabel: getCorrectionRequestTypeLabel(request.requestType),
       type: request.type,
       typeLabel: getTypeLabel(request.type),
       originalAt: request.originalAt,
       originalLabel: dateTimeFormatter.format(request.originalAt),
       correctedAt: request.correctedAt,
-      correctedLabel: dateTimeFormatter.format(request.correctedAt),
+      correctedLabel: request.correctedAt ? dateTimeFormatter.format(request.correctedAt) : undefined,
       reason: request.reason,
       status: request.status,
       statusLabel: getCorrectionStatusLabel(request.status),
@@ -108,12 +116,14 @@ export class AdminCorrectionRequestService {
           .filter((requestDoc) => requestDoc.data()['createdAt'])
           .map((requestDoc) => {
             const data = requestDoc.data();
+            const correctedAtTs = data['correctedAt'] as Timestamp | undefined;
             return {
               id: requestDoc.id,
               uid: requestDoc.ref.parent.parent!.id,
+              requestType: (data['requestType'] || 'modify') as CorrectionRequestType,
               type: data['type'] as AttendanceType,
               originalAt: (data['originalAt'] as Timestamp).toDate(),
-              correctedAt: (data['correctedAt'] as Timestamp).toDate(),
+              correctedAt: correctedAtTs?.toDate(),
               reason: data['reason'] as string,
               status: data['status'] as CorrectionRequestStatus,
             };
@@ -139,10 +149,6 @@ export class AdminCorrectionRequestService {
     });
   }
 
-  // Approving both marks the request as approved and corrects the actual
-  // attendance record: the matching punch's timestamp is overwritten (its
-  // previous value is kept in `correctedFrom`), or a new punch is created
-  // if no matching record exists (e.g. the employee forgot to punch at all).
   async approve(uid: string, requestId: string): Promise<void> {
     const adminEmail = this.authService.user()?.email;
     if (!adminEmail) {
@@ -154,8 +160,6 @@ export class AdminCorrectionRequestService {
       throw new Error('申請が見つかりません');
     }
 
-    const match = await this.findMatchingRecord(uid, request.type, request.originalAt);
-
     const batch = writeBatch(firestore);
 
     batch.update(doc(firestore, 'users', uid, 'correctionRequests', requestId), {
@@ -164,17 +168,25 @@ export class AdminCorrectionRequestService {
       reviewedBy: adminEmail,
     });
 
-    if (match) {
-      batch.update(match.ref, {
-        type: request.type,
-        timestamp: Timestamp.fromDate(request.correctedAt),
-        correctedFrom: match.timestamp,
-      });
-    } else {
+    if (request.requestType === 'modify') {
+      const match = await this.findMatchingRecord(uid, request.type, request.originalAt);
+      if (match && request.correctedAt) {
+        batch.update(match.ref, {
+          type: request.type,
+          timestamp: Timestamp.fromDate(request.correctedAt),
+          correctedFrom: match.timestamp,
+        });
+      }
+    } else if (request.requestType === 'add') {
       batch.set(doc(collection(firestore, 'users', uid, 'attendanceRecords')), {
         type: request.type,
-        timestamp: Timestamp.fromDate(request.correctedAt),
+        timestamp: Timestamp.fromDate(request.correctedAt || request.originalAt),
       });
+    } else if (request.requestType === 'delete') {
+      const match = await this.findMatchingRecord(uid, request.type, request.originalAt);
+      if (match) {
+        batch.delete(match.ref);
+      }
     }
 
     await batch.commit();

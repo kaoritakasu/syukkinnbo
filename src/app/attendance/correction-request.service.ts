@@ -28,6 +28,7 @@ export const dateTimeFormatter = new Intl.DateTimeFormat('ja-JP', {
 });
 
 export type CorrectionRequestStatus = 'pending' | 'approved' | 'rejected';
+export type CorrectionRequestType = 'modify' | 'add' | 'delete';
 
 const STATUS_LABELS: Record<CorrectionRequestStatus, string> = {
   pending: '申請中',
@@ -35,25 +36,38 @@ const STATUS_LABELS: Record<CorrectionRequestStatus, string> = {
   rejected: '却下',
 };
 
+const REQUEST_TYPE_LABELS: Record<CorrectionRequestType, string> = {
+  modify: '修正',
+  add: '追加',
+  delete: '削除',
+};
+
 export function getCorrectionStatusLabel(status: CorrectionRequestStatus): string {
   return STATUS_LABELS[status];
 }
 
+export function getCorrectionRequestTypeLabel(type: CorrectionRequestType): string {
+  return REQUEST_TYPE_LABELS[type];
+}
+
 export interface CorrectionRequestInput {
+  requestType: CorrectionRequestType;
   type: AttendanceType;
   originalAt: Date;
-  correctedAt: Date;
+  correctedAt?: Date;
   reason: string;
 }
 
 export interface CorrectionRequest {
   id: string;
+  requestType: CorrectionRequestType;
+  requestTypeLabel: string;
   type: AttendanceType;
   typeLabel: string;
   originalAt: Date;
   originalLabel: string;
-  correctedAt: Date;
-  correctedLabel: string;
+  correctedAt?: Date;
+  correctedLabel?: string;
   reason: string;
   status: CorrectionRequestStatus;
   statusLabel: string;
@@ -94,18 +108,22 @@ export class CorrectionRequestService {
             .filter((doc) => doc.data()['createdAt'])
             .map((doc) => {
               const data = doc.data();
+              const requestType = (data['requestType'] || 'modify') as CorrectionRequestType;
               const type = data['type'] as AttendanceType;
               const originalAt = (data['originalAt'] as Timestamp).toDate();
-              const correctedAt = (data['correctedAt'] as Timestamp).toDate();
+              const correctedAtTs = data['correctedAt'] as Timestamp | undefined;
+              const correctedAt = correctedAtTs?.toDate();
               const status = data['status'] as CorrectionRequestStatus;
               return {
                 id: doc.id,
+                requestType,
+                requestTypeLabel: getCorrectionRequestTypeLabel(requestType),
                 type,
                 typeLabel: getTypeLabel(type),
                 originalAt,
                 originalLabel: dateTimeFormatter.format(originalAt),
                 correctedAt,
-                correctedLabel: dateTimeFormatter.format(correctedAt),
+                correctedLabel: correctedAt ? dateTimeFormatter.format(correctedAt) : undefined,
                 reason: data['reason'] as string,
                 status,
                 statusLabel: getCorrectionStatusLabel(status),
@@ -123,13 +141,17 @@ export class CorrectionRequestService {
     }
 
     const requestsRef = collection(firestore, 'users', user.uid, 'correctionRequests');
-    await addDoc(requestsRef, {
+    const doc: any = {
+      requestType: input.requestType,
       type: input.type,
       originalAt: Timestamp.fromDate(input.originalAt),
-      correctedAt: Timestamp.fromDate(input.correctedAt),
       reason: input.reason,
       status: 'pending',
       createdAt: serverTimestamp(),
-    });
+    };
+    if (input.correctedAt) {
+      doc.correctedAt = Timestamp.fromDate(input.correctedAt);
+    }
+    await addDoc(requestsRef, doc);
   }
 }
