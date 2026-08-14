@@ -7,6 +7,29 @@
     <span>{{ title() }}</span>
   </div>
   <span class="clock-date">{{ nowDateLabel() }}</span>
+  <div class="topbar-notifications">
+    @if ((notificationService.notifications() | slice:0:3).length > 0; as notifications) {
+      <button type="button" class="btn btn-ghost notification-bell" (click)="showNotifications.set(!showNotifications())">
+        🔔 {{ notificationService.notifications().length }}
+      </button>
+      @if (showNotifications()) {
+        <div class="notification-dropdown">
+        @for (notif of notifications(); track notif?.id || $index) {
+          <div class="notification-item" [class.unread]="!notif.read">
+              <strong>{{ notif.title }}</strong>
+              <p>{{ notif.body }}</p>
+              <small>{{ notif.timestamp | date:'short' }}</small>
+            </div>
+          }
+          @if (notificationService.notifications().length > 3) {
+            <div class="notification-item-more">
+              他 {{ notificationService.notifications().length - 3 }} 件
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
   <div class="topbar-auth">
     @if (authService.loading()) {
       <span class="muted">読み込み中...</span>

@@ -174,7 +174,10 @@ export class AttendanceService {
       weekStart.setDate(now.getDate() - dayOfWeek);
       const weekStartKey = toDateKey(weekStart);
 
+      console.log('[35h] Weekly hours calc:', { hours: hours.toFixed(2), weekStartKey, notifiedWeekStart: this.notifiedWeekStart });
+
       if (hours >= 35 && this.notifiedWeekStart !== weekStartKey) {
+        console.log('[35h] Threshold reached. Creating notification...', { userId: user.uid, userEmail: user.email });
         this.notifiedWeekStart = weekStartKey;
         this.createNotification(user.uid, user.email || '');
       }
@@ -184,15 +187,18 @@ export class AttendanceService {
   private async createNotification(userId: string, userEmail: string): Promise<void> {
     try {
       const notifRef = doc(collection(firestore, 'notifications'));
+      console.log('[35h] Writing notification to Firestore:', { notifRefId: notifRef.id, userId, userEmail });
       await setDoc(notifRef, {
         userId,
         userEmail,
         type: 'weekly35hours',
         timestamp: serverTimestamp(),
         read: false,
+        notificationSent: false,
       });
+      console.log('[35h] Notification created successfully:', { notifRefId: notifRef.id });
     } catch (error) {
-      console.error('Failed to create notification:', error);
+      console.error('[35h] Failed to create notification:', error);
     }
   }  
   clockIn(): Promise<void> {

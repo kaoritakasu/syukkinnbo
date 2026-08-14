@@ -1,5 +1,6 @@
 import { Component, DestroyRef, computed, inject, signal, effect } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { SlicePipe } from '@angular/common';
 import { Router, RouterLink, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -9,6 +10,7 @@ import { AttendanceType, toDateKey, isSameMinute } from './attendance/attendance
 import { AttendanceService } from './attendance/attendance.service';
 import { CorrectionRequestService, CorrectionRequestType } from './attendance/correction-request.service';
 import { AuthService } from './auth/auth.service';
+import { NotificationService } from './notification/notification.service';
 
 const CORRECTION_TYPE_OPTIONS: { value: AttendanceType; label: string }[] = [
   { value: 'clockIn', label: '出勤' },
@@ -46,7 +48,7 @@ const STATUS_LABELS: any = {
 
 @Component({
   selector: 'app-root',
-  imports: [DatePipe, RouterLink, RouterOutlet],
+  imports: [DatePipe, RouterLink, RouterOutlet, SlicePipe],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -55,13 +57,16 @@ export class App {
   protected readonly authService = inject(AuthService);
   protected readonly attendanceService = inject(AttendanceService);
   protected readonly correctionRequestService = inject(CorrectionRequestService);
+  protected readonly notificationService = inject(NotificationService);
   protected readonly isAdmin = computed(() => this.authService.user()?.email === 'kaori.takasu@pathoslogos.co.jp');
   protected readonly pendingCorrectionCount = signal<number>(0);
   protected readonly pendingRequests = signal<any[]>([]);
+  protected readonly notifications = signal<any[]>([]);
   protected readonly showPendingRequests = signal(false);
   protected readonly showAdminPopup = signal(false);
   protected readonly showResultPopup = signal(false);
-  
+  protected readonly showNotifications = signal(false);
+
   // ▼ これが足りなかったスイッチ（変数） ▼
   protected readonly showRequestHistory = signal(false);
   
