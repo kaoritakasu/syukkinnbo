@@ -5,7 +5,7 @@ import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { collection, getDocs, getFirestore, query, collectionGroup, where, onSnapshot, updateDoc, doc, writeBatch, serverTimestamp, Timestamp, getDoc, QueryDocumentSnapshot, QuerySnapshot } from 'firebase/firestore';
 
-import { AttendanceType, toDateKey } from './attendance/attendance-format';
+import { AttendanceType, toDateKey, isSameMinute } from './attendance/attendance-format';
 import { AttendanceService } from './attendance/attendance.service';
 import { CorrectionRequestService } from './attendance/correction-request.service';
 import { AuthService } from './auth/auth.service';
@@ -399,16 +399,23 @@ export class App {
       const db = getFirestore();
       const recordsRef = collection(db, 'users', request.userId, 'attendanceRecords');
 
+      const startOfDay = new Date(request.originalAt);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+
       const recordQuery = query(
         recordsRef,
-        where('type', '==', request.type)
+        where('type', '==', request.type),
+        where('timestamp', '>=', Timestamp.fromDate(startOfDay)),
+        where('timestamp', '<', Timestamp.fromDate(endOfDay))
       );
       const recordSnapshot = await getDocs(recordQuery);
 
-      const targetTimeMs = request.originalAt.getTime();
       const originalRecord = recordSnapshot.docs.find(doc => {
-        const recordTimeMs = doc.data()['timestamp'].toDate().getTime();
-        return Math.abs(recordTimeMs - targetTimeMs) <= 60000;
+        const data = doc.data();
+        const timestamp = (data['timestamp'] as Timestamp).toDate();
+        return isSameMinute(timestamp, request.originalAt);
       });
 
       if (!originalRecord) {
